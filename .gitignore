@@ -81,3 +81,7 @@ popüler_siteler.xlsx
 create_logo.py
 create_header_logo.py
 
+# Metodoloji ve checkpoint dosyaları (sadece local)
+PROJE_METODOLOJI_PROMPT.md
+CHECKPOINT_*.md
+
