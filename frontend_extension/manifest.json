@@ -27,7 +27,8 @@
     },
     "host_permissions": [
         "<all_urls>",
-        "https://guvenli-internet-asistani.onrender.com/*"
+        "http://localhost/*",
+        "http://127.0.0.1/*"
     ],
     "content_scripts": [
         {
