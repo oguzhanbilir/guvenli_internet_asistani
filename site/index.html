@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Güvenli İnternet Asistanı - Web Arayüzü</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <div class="logo-icon">🛡️</div>
+                </div>
+                <div class="header-text">
+                    <h1>Güvenli İnternet Asistanı</h1>
+                    <p class="header-subtitle">Oltalama Saldırılarına Karşı Koruma</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- URL Input Section -->
+        <section id="input-section" class="input-section">
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="url-input" 
+                        class="url-input" 
+                        placeholder="Analiz etmek istediğiniz URL'yi girin (örn: https://example.com)"
+                        autocomplete="off"
+                    >
+                    <button id="analyze-button" class="analyze-button">
+                        <span class="button-icon">🔍</span>
+                        <span>Analiz Et</span>
+                    </button>
+                </div>
+                <p class="input-hint">Uzantıyı kurmadan manuel olarak URL analizi yapabilirsiniz</p>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <section id="status" class="status-section" hidden>
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p class="loading-text">Site analiz ediliyor...</p>
+                <p class="loading-subtext">Lütfen bekleyin</p>
+            </div>
+        </section>
+        
+        <!-- Results Section -->
+        <section id="result" class="result-section" hidden>
+            <!-- Score and URL Card -->
+            <div class="score-url-card">
+                <div class="score-url-header">
+                    <div class="score-section">
+                        <div class="score-label">Güven Puanı</div>
+                        <div class="score-value-container">
+                            <span id="score-value" class="score-value">--</span>
+                            <span class="score-max">/100</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div id="progress-bar" class="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="decision-section">
+                        <div class="decision-badge" id="decision-badge">
+                            <span id="decision-icon" class="decision-icon">--</span>
+                            <span id="decision-text" class="decision-text">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="url-section">
+                    <div class="url-icon">🌐</div>
+                    <div class="url-content">
+                        <div class="url-label">Analiz Edilen URL</div>
+                        <div id="current-url" class="url-text">--</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer Analysis -->
+            <div class="layers-section">
+                <div class="section-header">
+                    <span class="section-icon">📊</span>
+                    <h2>Katman Analizi</h2>
+                </div>
+                <div id="layer-container" class="layers-table"></div>
+            </div>
+            
+            <!-- Details Section -->
+            <details class="details-section">
+                <summary class="details-summary">
+                    <span class="details-icon">📋</span>
+                    <span>Detaylı Analiz Raporu</span>
+                    <span class="details-arrow">▼</span>
+                </summary>
+                <div class="details-content">
+                    <ul id="details-list" class="details-list"></ul>
+                </div>
+            </details>
+        </section>
+        
+        <!-- Error Section -->
+        <section id="error" class="error-section" hidden>
+            <div class="error-container">
+                <div class="error-icon">⚠️</div>
+                <h2 class="error-title">Analiz Tamamlanamadı</h2>
+                <p id="error-message" class="error-message">Bir hata oluştu. Lütfen daha sonra tekrar deneyin.</p>
+                <button id="retry-button" class="retry-button">
+                    <span class="retry-icon">🔄</span>
+                    <span>Tekrar Dene</span>
+                </button>
+            </div>
+        </section>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
