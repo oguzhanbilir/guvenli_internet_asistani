@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: guvenli-internet-asistani
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python api.py
+    envVars:
+      - key: PORT
+        sync: false
+    healthCheckPath: /health
+
