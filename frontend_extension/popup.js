@@ -1,4 +1,4 @@
-const API_ENDPOINT = "http://localhost:8000/analyze";
+const API_ENDPOINT = "https://guvenli-internet-asistani.onrender.com/analyze";
 
 const LAYER_INFO = {
     teknik: { label: "Teknik Analiz", icon: "🔧", color: "#4299e1" },
@@ -1048,7 +1048,7 @@ async function analyzeUrl(url) {
             
             // Network hataları için özel mesajlar
             if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("ERR_CONNECTION_REFUSED")) {
-                errorMessage = "Backend sunucusuna bağlanılamıyor. Lütfen:\n1. EXE dosyasını çalıştırdığınızdan emin olun\n2. Sunucunun http://localhost:8000 adresinde çalıştığını kontrol edin\n3. Firewall ayarlarınızı kontrol edin";
+                errorMessage = "Backend sunucusuna bağlanılamıyor. Lütfen:\n1. İnternet bağlantınızı kontrol edin\n2. Backend servisinin çalıştığını kontrol edin\n3. Daha sonra tekrar deneyin";
             } else if (errorMessage.includes("timeout") || errorMessage.includes("timed out")) {
                 errorMessage = "İstek zaman aşımına uğradı. Lütfen tekrar deneyin.";
             } else if (errorMessage.includes("CORS")) {

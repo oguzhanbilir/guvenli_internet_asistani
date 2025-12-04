@@ -1,8 +1,8 @@
 // Background Service Worker
 // Manifest v3 için background script - fetch isteklerini buradan yapıyoruz
 
-const API_ENDPOINT = "http://localhost:8000/analyze";
-const HEALTH_ENDPOINT = "http://localhost:8000/health";
+const API_ENDPOINT = "https://guvenli-internet-asistani.onrender.com/analyze";
+const HEALTH_ENDPOINT = "https://guvenli-internet-asistani.onrender.com/health";
 
 /**
  * Backend'e fetch isteği gönderir
