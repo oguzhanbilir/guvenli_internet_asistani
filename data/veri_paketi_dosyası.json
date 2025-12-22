@@ -1,0 +1,144 @@
+{
+  "url": "https://isbonk.com.tr/",
+  "guven_puani": 70,
+  "karar": "Şüpheli",
+  "analiz_dokumu": {
+    "teknik_risk": "Yüksek risk: En benzer domain www.isbank.com.tr (mesafe=1).",
+    "dilsel_risk": "Orta risk: İçerik indirilemedi: HTTPSConnectionPool(host='isbonk.com.tr', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001847F1AA4D0>: Failed to resolve 'isbonk.com.tr' ([Errno 11001] getaddrinfo failed)\"))",
+    "gorsel_risk": "Orta risk: Screenshot alınamadı; görsel analiz sınırlı."
+  },
+  "katman_skorlari": {
+    "teknik": 0.2706221198156681,
+    "dilsel": 0.6,
+    "gorsel": 0.4
+  },
+  "detaylı_sinyaller": {
+    "teknik": [
+      {
+        "name": "domain_yasi",
+        "value": null,
+        "weight": 1.5,
+        "risk_score": 0.4,
+        "details": "Creation date bilgisi mevcut değil."
+      },
+      {
+        "name": "supheli_tld",
+        "value": "tr",
+        "weight": 1.2,
+        "risk_score": 0,
+        "details": "TLD tr normal."
+      },
+      {
+        "name": "https_kullanimi",
+        "value": true,
+        "weight": 0.7,
+        "risk_score": 0.1,
+        "details": "HTTPS kullanılıyor."
+      },
+      {
+        "name": "typosquatting",
+        "value": 0.8571428571428571,
+        "weight": 1.5,
+        "risk_score": 0.8571428571428571,
+        "details": "En benzer domain www.isbank.com.tr (mesafe=1)."
+      },
+      {
+        "name": "url_uzunlugu",
+        "value": 22,
+        "weight": 0.5,
+        "risk_score": 0.1,
+        "details": "URL uzunluğu 22 karakter (normal)."
+      },
+      {
+        "name": "subdomain_sayisi",
+        "value": 1,
+        "weight": 0.6,
+        "risk_score": 0.1,
+        "details": "Subdomain sayısı: 1 (normal)."
+      },
+      {
+        "name": "domain_uzunlugu",
+        "value": 13,
+        "weight": 0.5,
+        "risk_score": 0.1,
+        "details": "Domain uzunluğu 13 karakter (normal)."
+      },
+      {
+        "name": "port_numarasi",
+        "value": 443,
+        "weight": 0.4,
+        "risk_score": 0.1,
+        "details": "Varsayılan port kullanılıyor (443)."
+      },
+      {
+        "name": "path_uzunlugu",
+        "value": 1,
+        "weight": 0.4,
+        "risk_score": 0.1,
+        "details": "Path uzunluğu 1 karakter (normal)."
+      },
+      {
+        "name": "query_parametre_sayisi",
+        "value": 0,
+        "weight": 0.3,
+        "risk_score": 0.1,
+        "details": "Query parametresi yok (normal)."
+      },
+      {
+        "name": "url_kisaltma_servisi",
+        "value": false,
+        "weight": 1,
+        "risk_score": 0.1,
+        "details": "URL kısaltma servisi kullanılmıyor (normal). Kontrol edilen domain: isbonk.com.tr"
+      },
+      {
+        "name": "homograph_karakter",
+        "value": 0,
+        "weight": 1.2,
+        "risk_score": 0.1,
+        "details": "Homograph karakter tespit edilmedi (normal)."
+      },
+      {
+        "name": "ssl_sertifika_analizi",
+        "value": 0.6,
+        "weight": 1.3,
+        "risk_score": 0.6,
+        "details": "SSL sertifika kontrolü yapılamadı: [Errno 11001] getaddrinfo failed"
+      },
+      {
+        "name": "redirect_sayisi",
+        "value": 0,
+        "weight": 0.8,
+        "risk_score": 0.1,
+        "details": "Redirect yok (normal)."
+      },
+      {
+        "name": "redirect_zinciri",
+        "value": [
+          "https://isbonk.com.tr/"
+        ],
+        "weight": 0.5,
+        "risk_score": 0.1,
+        "details": "Toplam 1 URL: https://isbonk.com.tr/"
+      }
+    ],
+    "dilsel": [
+      {
+        "name": "icerik_indirme",
+        "value": false,
+        "weight": 1,
+        "risk_score": 0.6,
+        "details": "İçerik indirilemedi: HTTPSConnectionPool(host='isbonk.com.tr', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001847F1AA4D0>: Failed to resolve 'isbonk.com.tr' ([Errno 11001] getaddrinfo failed)\"))"
+      }
+    ],
+    "gorsel": [
+      {
+        "name": "screenshot_alma",
+        "value": false,
+        "weight": 1,
+        "risk_score": 0.4,
+        "details": "Screenshot alınamadı; görsel analiz sınırlı."
+      }
+    ]
+  }
+}
