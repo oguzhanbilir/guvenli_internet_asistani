@@ -1,0 +1,589 @@
+/* Güvenlik Overlay (Analiz sırasında sayfayı engelle) */
+#phishing-security-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999998;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease-in;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.overlay-content {
+    text-align: center;
+    color: white;
+    max-width: 450px;
+    padding: 40px;
+    width: 100%;
+}
+
+/* Overlay Header - Logo ve İsim */
+.overlay-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+    gap: 8px;
+}
+
+.overlay-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px;
+    animation: logoFloat 3s ease-in-out infinite;
+    object-fit: contain;
+}
+
+.overlay-logo-emoji {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px;
+    animation: logoFloat 3s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+@keyframes logoFloat {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(5deg); }
+}
+
+.overlay-app-name {
+    font-size: 16px;
+    font-weight: 700;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+    opacity: 0.95;
+}
+
+.overlay-icon-container {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 30px rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    animation: iconFloat 2s ease-in-out infinite;
+}
+
+@keyframes iconFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+}
+
+.overlay-icon {
+    font-size: 40px;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.overlay-title {
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-message {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 24px;
+    opacity: 0.95;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Tarama Animasyonu */
+.overlay-scanning-animation {
+    margin: 20px auto;
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.scan-line {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.8) 50%, 
+        transparent 100%);
+    animation: scanMove 2s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes scanMove {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.scan-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+.dot-1 {
+    animation-delay: 0s;
+}
+
+.dot-2 {
+    animation-delay: 0.2s;
+}
+
+.dot-3 {
+    animation-delay: 0.4s;
+}
+
+@keyframes dotPulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    50% { 
+        transform: scale(1.3);
+        opacity: 1;
+    }
+}
+
+.overlay-spinner {
+    margin: 24px auto;
+    width: 48px;
+    height: 48px;
+}
+
+.spinner-ring {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.overlay-subtitle {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-top: 16px;
+    font-weight: 400;
+}
+
+/* Sonuç gösterimi stilleri */
+.overlay-result-score {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    margin: 20px 0 12px;
+}
+
+.score-value {
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    color: white;
+}
+
+.score-max {
+    font-size: 28px;
+    font-weight: 700;
+    opacity: 0.9;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.overlay-result-status {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+.overlay-result-decision {
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0.95;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    color: white;
+    margin-bottom: 16px;
+}
+
+.result-icon {
+    animation: resultBounce 0.6s ease-out;
+}
+
+@keyframes resultBounce {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* Tehlikeli site için butonlar */
+.overlay-warning-message {
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0.95;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    color: white;
+    margin: 20px 0 24px;
+    line-height: 1.5;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.overlay-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.overlay-btn {
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.3px;
+    min-width: 140px;
+}
+
+.overlay-btn-danger {
+    background: rgba(255, 255, 255, 0.95);
+    color: #eb3349;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.overlay-btn-danger:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.overlay-btn-danger:active {
+    transform: translateY(0);
+}
+
+.overlay-btn-warning {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.overlay-btn-warning:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.overlay-btn-warning:active {
+    transform: translateY(0);
+}
+
+/* Skip butonları */
+.overlay-skip-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.overlay-btn-skip {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    font-size: 14px;
+    padding: 10px 20px;
+}
+
+.overlay-btn-skip:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-btn-skip:active {
+    transform: translateY(0);
+}
+
+.overlay-btn-skip-always {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    font-size: 13px;
+    padding: 8px 16px;
+    opacity: 0.9;
+}
+
+.overlay-btn-skip-always:hover {
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-btn-skip-always:active {
+    transform: translateY(0);
+}
+
+/* Responsive butonlar */
+@media (max-width: 480px) {
+    .overlay-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .overlay-btn {
+        width: 100%;
+        min-width: auto;
+    }
+}
+
+/* Güvenlik Uyarı Banner Stilleri */
+
+#phishing-warning-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999999;
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite, slideIn 0.4s ease-out;
+    box-shadow: 0 4px 20px rgba(235, 51, 73, 0.4), 0 0 30px rgba(235, 51, 73, 0.3);
+    border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.warning-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    max-width: 100%;
+    margin: 0 auto;
+    position: relative;
+}
+
+.warning-icon-container {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.warning-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.warning-text {
+    flex: 1;
+    color: white;
+    min-width: 0;
+}
+
+.warning-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+}
+
+.warning-message {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    line-height: 1.4;
+}
+
+.warning-message strong {
+    font-weight: 900;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.warning-subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: 500;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.warning-close {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.warning-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.warning-close:active {
+    transform: scale(0.95) rotate(90deg);
+}
+
+/* Responsive tasarım */
+@media (max-width: 768px) {
+    .warning-content {
+        padding: 12px 16px;
+        gap: 12px;
+    }
+    
+    .warning-icon-container {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .warning-icon {
+        font-size: 24px;
+    }
+    
+    .warning-title {
+        font-size: 16px;
+    }
+    
+    .warning-message {
+        font-size: 13px;
+    }
+    
+    .warning-subtitle {
+        font-size: 11px;
+    }
+    
+    .warning-close {
+        width: 28px;
+        height: 28px;
+        font-size: 20px;
+    }
+}
+
+/* Sayfa içeriğini banner için kaydır (opsiyonel) */
+body:has(#phishing-warning-banner) {
+    padding-top: 0;
+}
+
+/* Banner'ın altındaki içeriği kaydırmak için */
+#phishing-warning-banner + * {
+    margin-top: 0;
+}
+

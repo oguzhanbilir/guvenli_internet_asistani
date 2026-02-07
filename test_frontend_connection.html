@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Bağlantı Testi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #ddd;
+            background: #f9f9f9;
+        }
+        .test-item.success {
+            border-left-color: #4caf50;
+            background: #e8f5e9;
+        }
+        .test-item.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .test-item.loading {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Frontend Bağlantı Testi</h1>
+    
+    <div class="test-container">
+        <h2>Backend Bağlantı Testleri</h2>
+        <button onclick="runAllTests()">Tüm Testleri Çalıştır</button>
+        
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Test Sonuçları</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_ENDPOINT = "http://localhost:8000/analyze";
+        const HEALTH_ENDPOINT = "http://localhost:8000/health";
+        
+        function addTestResult(testName, status, message, details = null) {
+            const resultsDiv = document.getElementById('test-results');
+            const testItem = document.createElement('div');
+            testItem.className = `test-item ${status}`;
+            
+            let statusText = status === 'success' ? '[OK]' : status === 'error' ? '[FAIL]' : '[LOADING]';
+            testItem.innerHTML = `
+                <strong>${statusText} ${testName}</strong>
+                ${message ? `<div>${message}</div>` : ''}
+                ${details ? `<div class="result">${JSON.stringify(details, null, 2)}</div>` : ''}
+            `;
+            
+            resultsDiv.appendChild(testItem);
+        }
+        
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testHealthCheck() {
+            addTestResult('Health Check', 'loading', 'Test ediliyor...');
+            
+            try {
+                const response = await fetch(HEALTH_ENDPOINT, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addTestResult('Health Check', 'success', 
+                        `Backend çalışıyor: ${data.status}`, data);
+                    return true;
+                } else {
+                    addTestResult('Health Check', 'error', 
+                        `HTTP ${response.status}: ${response.statusText}`);
+                    return false;
+                }
+            } catch (error) {
+                addTestResult('Health Check', 'error', 
+                    `Bağlantı hatası: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function testAnalyzeEndpoint() {
+            addTestResult('Analyze Endpoint', 'loading', 'Test ediliyor...');
+            
+            try {
+                const testUrl = 'https://www.google.com';
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: testUrl,
+                        include_visual: false
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addTestResult('Analyze Endpoint', 'success', 
+                        `Analiz başarılı: ${data.guven_puani} puan, ${data.karar}`, 
+                        {
+                            url: testUrl,
+                            guven_puani: data.guven_puani,
+                            karar: data.karar,
+                            katman_skorlari: data.katman_skorlari
+                        });
+                    return true;
+                } else {
+                    const errorText = await response.text();
+                    addTestResult('Analyze Endpoint', 'error', 
+                        `HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+                    return false;
+                }
+            } catch (error) {
+                addTestResult('Analyze Endpoint', 'error', 
+                    `Bağlantı hatası: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function testCORS() {
+            addTestResult('CORS Kontrolü', 'loading', 'Test ediliyor...');
+            
+            try {
+                // Normal GET request ile CORS header'larını kontrol et
+                const response = await fetch(HEALTH_ENDPOINT, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+                
+                // CORS header'larını kontrol et
+                // FastAPI CORS middleware normal response'larda da header'ları ekler
+                // Eğer header yoksa, OPTIONS preflight request'i dene
+                if (corsHeaders['Access-Control-Allow-Origin'] || response.ok) {
+                    // CORS çalışıyor - normal request başarılı
+                    // Eğer header yoksa ama request başarılıysa, CORS middleware çalışıyor demektir
+                    addTestResult('CORS Kontrolü', 'success', 
+                        'CORS ayarları doğru (request başarılı)', {
+                            'Response Status': response.status,
+                            'CORS Headers': corsHeaders,
+                            'Note': 'FastAPI CORS middleware aktif, cross-origin istekler destekleniyor'
+                        });
+                    return true;
+                } else {
+                    // OPTIONS preflight request'i dene
+                    try {
+                        const optionsResponse = await fetch(HEALTH_ENDPOINT, {
+                            method: 'OPTIONS',
+                            headers: {
+                                'Origin': window.location.origin,
+                                'Access-Control-Request-Method': 'GET'
+                            }
+                        });
+                        
+                        const preflightHeaders = {
+                            'Access-Control-Allow-Origin': optionsResponse.headers.get('Access-Control-Allow-Origin'),
+                            'Access-Control-Allow-Methods': optionsResponse.headers.get('Access-Control-Allow-Methods')
+                        };
+                        
+                        if (preflightHeaders['Access-Control-Allow-Origin']) {
+                            addTestResult('CORS Kontrolü', 'success', 
+                                'CORS ayarları doğru (preflight)', preflightHeaders);
+                            return true;
+                        } else {
+                            addTestResult('CORS Kontrolü', 'error', 
+                                'CORS başlıkları bulunamadı');
+                            return false;
+                        }
+                    } catch (optError) {
+                        // OPTIONS request başarısız ama normal request başarılıysa CORS çalışıyor
+                        if (response.ok) {
+                            addTestResult('CORS Kontrolü', 'success', 
+                                'CORS çalışıyor (normal request başarılı)', {
+                                    'Note': 'CORS middleware aktif, cross-origin istekler destekleniyor'
+                                });
+                            return true;
+                        } else {
+                            addTestResult('CORS Kontrolü', 'error', 
+                                `OPTIONS request hatası: ${optError.message}`);
+                            return false;
+                        }
+                    }
+                }
+            } catch (error) {
+                addTestResult('CORS Kontrolü', 'error', 
+                    `Test hatası: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function testTimeout() {
+            addTestResult('Timeout Kontrolü', 'loading', 'Test ediliyor...');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: 'https://www.google.com',
+                        include_visual: false
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    addTestResult('Timeout Kontrolü', 'success', 
+                        'Timeout mekanizması çalışıyor');
+                    return true;
+                } else {
+                    addTestResult('Timeout Kontrolü', 'error', 
+                        `HTTP ${response.status}`);
+                    return false;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    addTestResult('Timeout Kontrolü', 'error', 
+                        'Timeout çalışıyor (5s aşıldı)');
+                } else {
+                    addTestResult('Timeout Kontrolü', 'error', 
+                        `Hata: ${error.message}`);
+                }
+                return false;
+            }
+        }
+        
+        async function runAllTests() {
+            clearResults();
+            
+            const results = {
+                health: false,
+                analyze: false,
+                cors: false,
+                timeout: false
+            };
+            
+            results.health = await testHealthCheck();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            results.analyze = await testAnalyzeEndpoint();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            results.cors = await testCORS();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            results.timeout = await testTimeout();
+            
+            // Özet
+            const successCount = Object.values(results).filter(r => r).length;
+            const totalCount = Object.keys(results).length;
+            
+            const summaryDiv = document.getElementById('results');
+            summaryDiv.innerHTML = `
+                <h3>Test Özeti</h3>
+                <p><strong>Başarılı:</strong> ${successCount}/${totalCount}</p>
+                <p><strong>Başarı Oranı:</strong> ${(successCount/totalCount*100).toFixed(1)}%</p>
+                <ul>
+                    <li>Health Check: ${results.health ? '✓' : '✗'}</li>
+                    <li>Analyze Endpoint: ${results.analyze ? '✓' : '✗'}</li>
+                    <li>CORS: ${results.cors ? '✓' : '✗'}</li>
+                    <li>Timeout: ${results.timeout ? '✓' : '✗'}</li>
+                </ul>
+            `;
+        }
+        
+        // Sayfa yüklendiğinde otomatik test
+        window.addEventListener('load', () => {
+            console.log('Frontend bağlantı testi hazır. "Tüm Testleri Çalıştır" butonuna tıklayın.');
+        });
+    </script>
+</body>
+</html>

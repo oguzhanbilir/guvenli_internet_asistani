@@ -1,0 +1,60 @@
+{
+    "manifest_version": 3,
+    "name": "Güvenli İnternet Asistanı",
+    "description": "Dinamik oltalama saldırılarına karşı URL analiz eden yardımcı eklenti.",
+    "version": "0.1.0",
+    "icons": {
+        "16": "icon16.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Güvenli İnternet Asistanı",
+        "default_icon": {
+            "16": "icon16.png",
+            "48": "icon48.png",
+            "128": "icon128.png"
+        }
+    },
+    "permissions": [
+        "activeTab",
+        "tabs",
+        "storage"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "host_permissions": [
+        "<all_urls>",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["http://*/*", "https://*/*"],
+            "js": ["content.js"],
+            "css": ["content.css"],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://mail.google.com/*",
+                "https://outlook.live.com/*",
+                "https://outlook.office.com/*",
+                "https://mail.yahoo.com/*",
+                "https://mail.yandex.com/*",
+                "https://mail.yandex.ru/*"
+            ],
+            "js": ["email_analyzer.js"],
+            "run_at": "document_idle"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["icon16.png", "icon48.png", "icon128.png"],
+            "matches": ["<all_urls>"]
+        }
+    ]
+}
+
