@@ -1,0 +1,13 @@
+# Render için hafif requirements (build hatasını önlemek için sadeleştirildi)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-whois==0.8.0
+python-Levenshtein==0.23.0
+Pillow==10.1.0
+imagehash==4.3.1
+numpy<2
+scikit-learn<2
+pandas<2
