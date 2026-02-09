@@ -128,6 +128,228 @@ HOMOGRAPH_CHARS = {
     'Р': 'P', 'С': 'C', 'Т': 'T', 'У': 'Y', 'Х': 'X'
 }
 
+# ASCII görünüm benzerleri (homograf / typosquatting) - her URL için uygulanır
+# Uzun eşleşmeler önce uygulanmalı
+ASCII_LOOKALIKES = [
+    # Çift karakterli yaygın taklitler
+    ("rn", "m"), ("nn", "m"), ("nm", "m"), ("vv", "w"), ("uu", "w"),
+    ("cl", "d"), ("ii", "u"), ("ll", "i"), ("ri", "n"), ("ln", "h"),
+    ("0o", "o"), ("o0", "o"),
+    # Tek karakter: rakam/benzeri -> harf
+    ("0", "o"), ("1", "l"), ("5", "s"), ("3", "e"), ("4", "a"),
+    ("7", "t"), ("8", "b"), ("9", "g"), ("2", "z"),
+]
+
+MIN_BRAND_SEGMENT_LEN = 4  # Bu uzunluktan kısa segmentler marka karşılaştırmasında atlanır
+
+# PhishTank API (bilinen oltalama URL'lerini kontrol için) - https://phishtank.org/api_info.php
+PHISHTANK_CHECK_URL = "http://checkurl.phishtank.com/checkurl/"
+PHISHTANK_USER_AGENT = "phishtank/GuvenliInternetAsistani"
+PHISHTANK_TIMEOUT = 10
+PHISHTANK_APP_KEY = os.environ.get("PHISHTANK_APP_KEY", "").strip()  # İsteğe bağlı; daha yüksek limit için
+
+# Yerel yedek blok listesi: PhishTank API erişilemez veya gecikirse bile bu domain'ler kesin Tehlikeli
+# (PhishTank'tan veya güvenilir kaynaklardan doğrulanmış)
+KNOWN_PHISHING_DOMAINS: set = {
+    "farncisonegen.com",
+    "rnicrosoft-login.com",
+    "rnicrosoft.com",
+    "g00gle.com",
+    "paypa1.com",
+    "micr0soft.com",
+    "amaz0n.com",
+    "faceb00k.com",
+}
+
+
+def _phishtank_check_one(url_to_check: str) -> Tuple[bool, Optional[str], Optional[int]]:
+    """Tek bir URL ile PhishTank API'ye istek atar. Döner: (in_db, detail, phish_id)."""
+    try:
+        data = {"url": url_to_check, "format": "json"}
+        if PHISHTANK_APP_KEY:
+            data["app_key"] = PHISHTANK_APP_KEY
+        headers = {"User-Agent": PHISHTANK_USER_AGENT}
+        resp = requests.post(
+            PHISHTANK_CHECK_URL,
+            data=data,
+            headers=headers,
+            timeout=PHISHTANK_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            if resp.status_code == 509:
+                LOGGER.warning("PhishTank rate limit (509) aşıldı.")
+            return False, None, None
+        body = resp.json()
+        results = body.get("results") or {}
+        in_db = results.get("in_database")
+        if in_db in (True, "true", "y"):
+            phish_id = results.get("phish_id")
+            detail_page = results.get("phish_detail_page", "")
+            detail = f"PhishTank veritabanında kayıtlı (phish_id={phish_id}). {detail_page}" if phish_id else "PhishTank veritabanında oltalama olarak işaretlenmiş."
+            return True, detail, int(phish_id) if phish_id else None
+        return False, None, None
+    except requests.exceptions.Timeout:
+        LOGGER.warning("PhishTank API zaman asimina ugradi (URL: %s)", url_to_check[:80])
+        return False, None, None
+    except requests.exceptions.RequestException as e:
+        LOGGER.warning("PhishTank API istegi basarisiz: %s", e)
+        return False, None, None
+    except (json.JSONDecodeError, ValueError, KeyError):
+        return False, None, None
+
+
+def check_phishtank(url: str) -> Tuple[bool, Optional[str], Optional[int]]:
+    """
+    PhishTank veritabanında URL'nin oltalama olarak kayıtlı olup olmadığını kontrol eder.
+    Birden fazla URL varyantı dener (https/http, sondaki slash) çünkü PhishTank tam eşleşme yapabilir.
+    Döner: (veritabaninda_var, detay_mesaji, phish_id veya None)
+    API: https://phishtank.org/api_info.php
+    """
+    parsed = urlparse(url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    path = (parsed.path or "/").rstrip("/") or ""
+    full_base = base + path
+
+    # Denenecek URL varyantları (PhishTank'ta farklı şekilde kayıtlı olabilir)
+    variants = [url]
+    if url.endswith("/") and len(url) > 1:
+        variants.append(url.rstrip("/"))
+    if full_base != url and full_base not in variants:
+        variants.append(full_base)
+    # Aynı site bazen http bazen https ile kayıtlı
+    if parsed.scheme == "https":
+        other_base = "http://" + parsed.netloc + path
+        if other_base not in variants:
+            variants.append(other_base)
+
+    for u in variants:
+        in_db, detail, phish_id = _phishtank_check_one(u)
+        if in_db and detail:
+            LOGGER.info("PhishTank: URL veritabaninda tespit edildi -> %s", u)
+            return True, detail, phish_id
+
+    LOGGER.info("PhishTank: URL veritabaninda bulunamadi veya API erisilemedi (denenen: %s)", url)
+    return False, None, None
+
+
+def normalize_ascii_lookalikes(text: str) -> str:
+    """Metni ASCII görünüm benzeri dizileriyle normalize eder (örn. rnicrosoft -> microsoft, g00gle -> google)."""
+    t = text.lower()
+    for from_str, to_str in ASCII_LOOKALIKES:
+        t = t.replace(from_str, to_str)
+    return t
+
+
+def get_domain_segments_for_brand_check(domain: str) -> List[str]:
+    """
+    Hostname'deki tüm anlamlı segmentleri döndürür (subdomain + ana label, tire ile ayrılmış).
+    Örn: login.rnicrosoft.com -> ['login', 'rnicrosoft']; rnicrosoft-login.com -> ['rnicrosoft', 'login']
+    Her URL için homograf/typosquatting kontrolünde kullanılır.
+    """
+    host = domain.lower().replace("www.", "").strip()
+    segments: List[str] = []
+    for part in host.split("."):
+        for token in part.split("-"):
+            if len(token) >= MIN_BRAND_SEGMENT_LEN and token.isalnum():
+                segments.append(token)
+    return segments
+
+
+def _get_brand_names_from_data(brand_data: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+    """(marka_adi, gorunen_adi) listesi - domain'den çıkarılmış marka adı ve gösterim adı."""
+    result: List[Tuple[str, str]] = []
+    seen = set()
+    for entry in brand_data:
+        legit_domain = (entry.get("domain") or "").lower().strip()
+        if not legit_domain:
+            continue
+        brand_name = extract_brand_name_from_domain(legit_domain)
+        if brand_name and len(brand_name) >= MIN_BRAND_SEGMENT_LEN and brand_name not in seen:
+            seen.add(brand_name)
+            result.append((brand_name, entry.get("name", brand_name)))
+    return result
+
+
+def check_ascii_lookalike_brand_match(
+    segments: List[str], brand_data: List[Dict[str, Any]]
+) -> Tuple[bool, Optional[str]]:
+    """
+    Segmentlerden herhangi biri, ASCII lookalike normalize edildikten sonra bilinen bir marka ile
+    tam eşleşiyorsa True ve marka adını döndürür (örn. rnicrosoft -> microsoft).
+    """
+    brands = _get_brand_names_from_data(brand_data)
+    for seg in segments:
+        normalized = normalize_ascii_lookalikes(seg)
+        for brand_name, display_name in brands:
+            if normalized == brand_name:
+                return True, display_name
+    return False, None
+
+
+def check_typosquatting_against_brands(
+    domain: str,
+    domain_main: str,
+    segments: List[str],
+    brand_data: List[Dict[str, Any]],
+    exact_match: bool,
+    parent_domain_match: bool,
+    levenshtein_fn: Optional[Any],
+) -> Tuple[float, str, Optional[int], Optional[str]]:
+    """
+    Typosquatting risk skoru, açıklama, min Levenshtein mesafesi ve en benzer domain.
+    Tam eşleşme/parent eşleşmesi zaten varsa 0 risk döner.
+    """
+    if exact_match or parent_domain_match:
+        return (
+            0.0,
+            "Analiz edilen domain bilgi bankasındaki bir domain ile tam eşleşiyor."
+            if exact_match
+            else "Analiz edilen domain, bilgi bankasındaki bir domain'in alt domain'i (resmi domain).",
+            None,
+            None,
+        )
+    if not levenshtein_fn:
+        return 0.5, "python-levenshtein kütüphanesi eksik.", None, None
+
+    brands = _get_brand_names_from_data(brand_data)
+    min_distance: Optional[int] = None
+    most_similar: Optional[str] = None
+    # 1) Substring: domain içinde tam marka adı geçiyor mu?
+    for brand_name, display_name in brands:
+        if brand_name in domain_main or brand_name in domain.lower():
+            return 0.95, f"Domain içinde '{display_name}' marka adı geçiyor (substring eşleşmesi).", None, None
+
+    # 2) Segment bazlı: her segment için Levenshtein ve normalize-edilmiş tam eşleşme
+    for seg in segments:
+        normalized_seg = normalize_ascii_lookalikes(seg)
+        for brand_name, display_name in brands:
+            if normalized_seg == brand_name:
+                return 0.92, f"Domain segmenti marka ile görünüm benzeri eşleşiyor ('{display_name}').", 0, None
+            dist = levenshtein_fn(seg, brand_name)
+            if dist <= 2:
+                if min_distance is None or dist < min_distance:
+                    min_distance = dist
+                    most_similar = display_name
+
+    # 3) Tüm ana label (tireli) ile marka adı karşılaştırması
+    analyzed_brand_name = extract_brand_name_from_domain(domain)
+    for brand_name, display_name in brands:
+        if not analyzed_brand_name or len(brand_name) < MIN_BRAND_SEGMENT_LEN:
+            continue
+        dist = levenshtein_fn(analyzed_brand_name, brand_name)
+        if analyzed_brand_name[0] != brand_name[0]:
+            dist += 2
+        elif len(analyzed_brand_name) >= 2 and len(brand_name) >= 2 and analyzed_brand_name[:2] != brand_name[:2]:
+            dist += 1
+        if dist <= 2 and (min_distance is None or dist < min_distance):
+            min_distance = dist
+            most_similar = display_name
+
+    if min_distance is not None and most_similar is not None:
+        score = normalize_score(2 - min_distance, -5, 2)
+        return score, f"En benzer marka: {most_similar} (mesafe={min_distance}).", min_distance, most_similar
+    return 0.0, "Karşılaştırma yapılacak marka bulunamadı.", None, None
+
 SOCIAL_ENGINEERING_KEYWORDS = [
     "acil",
     "hemen",
@@ -218,6 +440,18 @@ def get_domain(url: str) -> str:
     return parsed.netloc.lower()
 
 
+def get_root_domain(url: str) -> str:
+    """URL'nin root/ana domain'ini döndürür (örn. notebooklm.google.com -> google.com)."""
+    try:
+        host = get_domain(url)
+        parts = host.split(".")
+        if len(parts) >= 2:
+            return ".".join(parts[-2:])
+        return host
+    except Exception:
+        return ""
+
+
 def get_tld(domain: str) -> str:
     return domain.split(".")[-1]
 
@@ -273,38 +507,56 @@ def compute_linguistic_score(keyword_hits: Dict[str, int]) -> Tuple[int, float]:
     return total_hits, score
 
 
-def calculate_logo_similarity(screenshot_path: str, logo_entries: List[Dict[str, Any]]) -> Tuple[float, Optional[str]]:
+def calculate_logo_similarity(
+    screenshot_path: str,
+    logo_entries: List[Dict[str, Any]],
+    page_root_domain: Optional[str] = None,
+) -> Tuple[float, Optional[str], Optional[str]]:
+    """En iyi logo eslesmesini dondurur. page_root_domain verilirse once ayni root domain'li marka tercih edilir."""
     if imagehash is None or Image is None:
-        return 0.0, None
+        return 0.0, None, None
 
     try:
         screenshot = Image.open(screenshot_path)
         screenshot_hash = imagehash.phash(screenshot)
     except (OSError, ValueError) as exc:
         LOGGER.error("Screenshot hash hesaplanamadı: %s", exc)
-        return 0.0, None
+        return 0.0, None, None
 
     if not logo_entries:
-        return 0.0, None
+        return 0.0, None, None
 
-    distances = []
+    max_hash_dist = 64
+    candidates: List[Tuple[float, str, Optional[str]]] = []
     for entry in logo_entries:
         try:
             hash_value = entry.get("logo_hash")
             if not hash_value:
                 continue
             reference_hash = imagehash.hex_to_hash(hash_value)
-            distances.append((screenshot_hash - reference_hash, entry.get("name")))
+            dist = screenshot_hash - reference_hash
+            sim = max(0.0, min(1.0, 1 - (dist / max_hash_dist)))
+            domain = (entry.get("domain") or "").lower() or None
+            candidates.append((sim, entry.get("name") or "", domain))
         except ValueError:
             continue
 
-    if not distances:
-        return 0.0, None
+    if not candidates:
+        return 0.0, None, None
 
-    min_distance, brand_name = min(distances, key=lambda item: item[0])
-    max_hash_dist = 64  # phash 64-bit sonuç döndürür
-    similarity = 1 - (min_distance / max_hash_dist)
-    return max(0.0, min(1.0, similarity)), brand_name
+    candidates.sort(key=lambda x: -x[0])
+    if page_root_domain:
+        for sim, name, dom in candidates:
+            if sim < 0.2:
+                break
+            if dom:
+                try:
+                    if get_root_domain("https://" + dom.lstrip("/")) == page_root_domain:
+                        return sim, name or None, dom
+                except Exception:
+                    pass
+    best = candidates[0]
+    return best[0], best[1] or None, best[2]
 
 
 def extract_dominant_colors(image_path: str, clusters: int = 5) -> List[Tuple[int, int, int]]:
@@ -343,6 +595,31 @@ def compare_color_palettes(palette_a: List[Tuple[int, int, int]], palette_b: Lis
 def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[AnalysisSignal]:
     signals: List[AnalysisSignal] = []
     domain = get_domain(url)
+
+    # PhishTank + yerel blok listesi: Bilinen oltalama kesin Tehlikeli
+    in_phishtank, phish_detail, phish_id = check_phishtank(url)
+    domain_normalized = domain.lower().replace("www.", "").strip()
+    if in_phishtank and phish_detail:
+        signals.append(
+            AnalysisSignal(
+                name="phishtank_veritabani",
+                value=phish_id or 1,
+                weight=2.0,
+                risk_score=0.98,
+                details=phish_detail,
+            )
+        )
+    elif domain_normalized in KNOWN_PHISHING_DOMAINS:
+        signals.append(
+            AnalysisSignal(
+                name="phishtank_veritabani",
+                value=1,
+                weight=2.0,
+                risk_score=0.98,
+                details="Yerel blok listesinde (bilinen oltalama alan adı). Bu site güvenilir kaynaklarda tehlikeli olarak işaretlenmiş.",
+            )
+        )
+
     tld = get_tld(domain)
     domain_age_days = None
     domain_is_young = False
@@ -468,8 +745,7 @@ def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analy
         lowered = domain.lower()
         domain_parts = lowered.split(".")
         domain_main = domain_parts[0] if domain_parts else lowered
-        analyzed_brand_name = extract_brand_name_from_domain(domain)
-        
+
         exact_match = False
         parent_domain_match = False
         domain_parts_list = lowered.split(".")
@@ -503,11 +779,6 @@ def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analy
                     parent_domain_match = True
                     break
         
-        min_distance = None
-        most_similar = None
-        substring_match = False
-        substring_brand = None
-        
         if not parent_domain_match and len(domain_parts_list) > 2:
             parent_domain_simple = ".".join(domain_parts_list[-2:])
             for entry in brand_data:
@@ -518,91 +789,12 @@ def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analy
                 if cleaned_legit_temp == parent_domain_simple:
                     parent_domain_match = True
                     break
-        
-        if exact_match or parent_domain_match:
-            typo_risk_score = 0.0
-            if exact_match:
-                typo_detail = "Analiz edilen domain bilgi bankasındaki bir domain ile tam eşleşiyor."
-            else:
-                typo_detail = "Analiz edilen domain, bilgi bankasındaki bir domain'in alt domain'i (resmi domain)."
-        else:
-            for entry in brand_data:
-                legit_domain = entry.get("domain", "").lower()
-                if not legit_domain:
-                    continue
-                
-                cleaned_legit_check = legit_domain.replace("www.", "")
-                legit_domain_parts = legit_domain.split(".")
-                
-                if len(domain_parts_list) > len(legit_domain_parts):
-                    parent_check = ".".join(domain_parts_list[-len(legit_domain_parts):])
-                    if (legit_domain == parent_check or cleaned_legit_check == parent_check or
-                        legit_domain in lowered and lowered.endswith(legit_domain) or
-                        cleaned_legit_check in cleaned_lowered and cleaned_lowered.endswith("." + cleaned_legit_check)):
-                        continue
-                
-                if len(domain_parts_list) > 2:
-                    simple_parent = ".".join(domain_parts_list[-2:])
-                    if cleaned_legit_check == simple_parent:
-                        continue
-                
-                brand_name = extract_brand_name_from_domain(legit_domain)
-                
-                if brand_name and len(brand_name) >= 4:
-                    if brand_name in domain_main or brand_name in lowered:
-                        substring_match = True
-                        substring_brand = entry.get("name", brand_name)
-                        break
-            
-            if not substring_match:
-                for entry in brand_data:
-                    legit_domain = entry.get("domain", "").lower()
-                    if not legit_domain:
-                        continue
-                    
-                    brand_name = extract_brand_name_from_domain(legit_domain)
-                    
-                    if analyzed_brand_name and brand_name and len(brand_name) >= 4:
-                        dist_brand = levenshtein_distance(analyzed_brand_name, brand_name)
-                        
-                        if analyzed_brand_name[0] != brand_name[0]:
-                            # İlk karakter farklıysa, mesafeyi artır (daha az risk)
-                            dist_brand += 2
-                        elif len(analyzed_brand_name) >= 2 and len(brand_name) >= 2:
-                            if analyzed_brand_name[:2] != brand_name[:2]:
-                                # İlk 2 karakter farklıysa, mesafeyi artır
-                                dist_brand += 1
-                        
-                        dist = dist_brand
-                    else:
-                        # Tam domain karşılaştırması (fallback)
-                        dist = levenshtein_distance(lowered, legit_domain)
-                    
-                    # Sadece gerçekten benzer olanları dikkate al (mesafe <= 2)
-                    # Mesafe 3'ten büyükse farklı markalar olabilir
-                    if dist <= 2:
-                        if min_distance is None or dist < min_distance:
-                            min_distance = dist
-                            most_similar = legit_domain
-        
-        # Sonuç değerlendirmesi
-        if substring_match:
-            # Substring eşleşmesi bulundu - YÜKSEK RİSK
-            typo_risk_score = 0.95  # Çok yüksek risk
-            typo_detail = f"Domain içinde '{substring_brand}' marka adı geçiyor (substring eşleşmesi)."
-        elif min_distance is not None:
-            if min_distance == 0:
-                typo_risk_score = 0.0
-                typo_detail = "Analiz edilen domain bilgi bankasındaki bir domain ile tam eşleşiyor."
-            else:
-                # Levenshtein mesafesine göre risk hesapla
-                typo_risk_score = normalize_score(2 - min_distance, -5, 2)
-                typo_detail = (
-                    f"En benzer domain {most_similar} (mesafe={min_distance})."
-                )
-        else:
-            typo_risk_score = 0.0
-            typo_detail = "Karşılaştırma yapılacak marka bulunamadı."
+
+        domain_segments = get_domain_segments_for_brand_check(domain)
+        typo_risk_score, typo_detail, _, _ = check_typosquatting_against_brands(
+            domain, domain_main, domain_segments, brand_data,
+            exact_match, parent_domain_match, levenshtein_distance,
+        )
 
     signals.append(
         AnalysisSignal(
@@ -780,18 +972,25 @@ def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analy
     for char in domain:
         if char in HOMOGRAPH_CHARS:
             homograph_count += 1
-    
+
+    # Tüm hostname segmentleri (subdomain + ana label) üzerinden ASCII lookalike marka taklidi
+    domain_segments = get_domain_segments_for_brand_check(domain)
+    ascii_lookalike_brand_match, matched_brand = check_ascii_lookalike_brand_match(domain_segments, brand_data)
+
     if homograph_count > 0:
         homograph_risk = min(0.9, 0.3 + (homograph_count * 0.2))
         homograph_detail = f"Homograph karakter tespit edildi ({homograph_count} adet). Benzer görünen karakterler oltalama saldırılarında kullanılabilir!"
+    elif ascii_lookalike_brand_match:
+        homograph_risk = 0.92
+        homograph_detail = f"Domain, '{matched_brand}' markasına benzer görünen karakterlerle yazılmış (ASCII lookalike, örn. rn→m). Oltalama riski yüksek!"
     else:
         homograph_risk = 0.1
         homograph_detail = "Homograph karakter tespit edilmedi (normal)."
-    
+
     signals.append(
         AnalysisSignal(
             name="homograph_karakter",
-            value=homograph_count,
+            value=homograph_count + (1 if ascii_lookalike_brand_match else 0),
             weight=1.2,
             risk_score=homograph_risk,
             details=homograph_detail,
@@ -923,10 +1122,17 @@ def technical_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analy
             redirect_detail_parts = [f"Redirect zinciri ({redirect_count} adet):"]
             for i, redirect_url in enumerate(redirect_chain, 1):
                 redirect_detail_parts.append(f"{i}. {redirect_url}")
-            
             redirect_detail = "\n".join(redirect_detail_parts)
-            
-            if redirect_count > 3:
+
+            root_original = get_root_domain(url)
+            all_same_root = all(
+                get_root_domain(u) == root_original
+                for u in redirect_chain
+            )
+            if all_same_root:
+                redirect_risk = 0.1
+                redirect_detail += "\n[OK] Tüm yönlendirmeler aynı domain içinde (güvenli)."
+            elif redirect_count > 3:
                 redirect_risk = 0.7
                 redirect_detail += "\n⚠️ Çok fazla redirect! Oltalama saldırılarında kullanılabilir!"
             elif redirect_count > 1:
@@ -978,14 +1184,32 @@ def linguistic_analysis(url: str) -> List[AnalysisSignal]:
                 name="icerik_indirme",
                 value=False,
                 weight=1.0,
-                risk_score=0.6,
-                details=f"İçerik indirilemedi: {exc}",
+                risk_score=0.5,
+                details=(
+                    "Dilsel içerik indirilemedi. Sayfa erişilemiyor, zaman aşımına uğradı veya engel var. "
+                    "Bu sayfada sosyal mühendislik metin analizi yapılamadı; diğer katmanlar (teknik, görsel) değerlendirmeye alındı."
+                ),
             )
         )
         return signals
 
     soup = BeautifulSoup(response.text, "html.parser")
     texts = " ".join(soup.stripped_strings).lower()
+    if len(texts.strip()) < 80:
+        signals.append(
+            AnalysisSignal(
+                name="icerik_indirme",
+                value=False,
+                weight=1.0,
+                risk_score=0.4,
+                details=(
+                    "Dilsel içerik yeterli değil. Sayfa çok az metin içeriyor veya içerik JavaScript ile sonradan yükleniyor. "
+                    "Sosyal mühendislik metin analizi sınırlı; diğer katmanlar değerlendirmeye alındı."
+                ),
+            )
+        )
+        return signals
+
     site_type = detect_site_type(url, domain, texts)
     
     keyword_hits: Dict[str, int] = {}
@@ -1165,33 +1389,46 @@ def visual_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analysis
             except TypeError:
                 continue
 
-    logo_similarity, matched_logo_brand = calculate_logo_similarity(temp_path, known_logos)
-    logo_risk = logo_similarity if logo_similarity >= LOGO_SIMILARITY_ALERT_THRESHOLD else 0.0
+    root_page = get_root_domain(url)
+    logo_similarity, matched_logo_brand, matched_logo_domain = calculate_logo_similarity(
+        temp_path, known_logos, page_root_domain=root_page
+    )
+    logo_same_root = False
+    if matched_logo_domain:
+        try:
+            logo_same_root = root_page and root_page == get_root_domain("https://" + matched_logo_domain.lstrip("/"))
+        except Exception:
+            pass
+    if logo_same_root:
+        logo_risk = 0.0
+        logo_detail = (
+            f"Logo benzerlik skoru: {logo_similarity:.2f}, en yakın marka: {matched_logo_brand}. "
+            "Aynı domain ailesi; risk oluşturmaz."
+        )
+    else:
+        logo_risk = logo_similarity if logo_similarity >= LOGO_SIMILARITY_ALERT_THRESHOLD else 0.0
+        logo_detail = (
+            f"Logo benzerlik skoru: {logo_similarity:.2f}"
+            + (f", en yakın marka: {matched_logo_brand}" if matched_logo_brand else "")
+            + (
+                ""
+                if logo_similarity >= LOGO_SIMILARITY_ALERT_THRESHOLD
+                else f" (eşik {LOGO_SIMILARITY_ALERT_THRESHOLD:.2f}, bilgilendirme amaçlı)"
+            )
+        )
     signals.append(
         AnalysisSignal(
             name="logo_taklidi",
             value=logo_similarity,
             weight=1.5,
             risk_score=logo_risk,
-            details=(
-                f"Logo benzerlik skoru: {logo_similarity:.2f}"
-                + (
-                    f", en yakın marka: {matched_logo_brand}"
-                    if matched_logo_brand
-                    else ""
-                )
-                + (
-                    ""
-                    if logo_similarity >= LOGO_SIMILARITY_ALERT_THRESHOLD
-                    else f" (eşik {LOGO_SIMILARITY_ALERT_THRESHOLD:.2f}, bilgilendirme amaçlı)"
-                )
-            ),
+            details=logo_detail,
         )
     )
 
     dominant_colors = extract_dominant_colors(temp_path)
     if dominant_colors:
-        palette_similarities: List[Tuple[float, Optional[str]]] = []
+        palette_similarities: List[Tuple[float, Optional[str], Optional[str]]] = []
         for entry in brand_data:
             palette = entry.get("renk_paleti_rgb")
             if not palette:
@@ -1201,20 +1438,60 @@ def visual_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analysis
             except TypeError:
                 continue
             similarity = compare_color_palettes(dominant_colors, palette_tuples)
-            palette_similarities.append((similarity, entry.get("name")))
+            palette_similarities.append((
+                similarity,
+                entry.get("name"),
+                entry.get("domain", "").lower() or None,
+            ))
 
         if palette_similarities:
-            best_similarity, best_brand = max(palette_similarities, key=lambda item: item[0])
+            palette_similarities.sort(key=lambda item: -item[0])
+            best_similarity, best_brand, best_brand_domain = palette_similarities[0]
+            if root_page:
+                for sim, name, dom in palette_similarities:
+                    if sim < 0.2:
+                        break
+                    if dom:
+                        try:
+                            if get_root_domain("https://" + dom.lstrip("/")) == root_page:
+                                best_similarity, best_brand, best_brand_domain = sim, name, dom
+                                break
+                        except Exception:
+                            pass
         else:
-            best_similarity, best_brand = 0.0, None
+            best_similarity, best_brand, best_brand_domain = 0.0, None, None
     else:
-        best_similarity, best_brand = 0.0, None
+        best_similarity, best_brand, best_brand_domain = 0.0, None, None
 
-    palette_risk = (
-        best_similarity * 0.7
-        if best_similarity >= PALETTE_SIMILARITY_ALERT_THRESHOLD
-        else 0.0
-    )
+    same_root_as_brand = False
+    if best_brand_domain and root_page:
+        try:
+            root_brand = get_root_domain("https://" + best_brand_domain.lstrip("/"))
+            same_root_as_brand = root_brand and root_page == root_brand
+        except Exception:
+            pass
+
+    if same_root_as_brand:
+        palette_risk = 0.0
+        palette_detail = (
+            f"Renk paleti benzerliği: {best_similarity:.2f}, en yakın marka: {best_brand}. "
+            "Aynı domain ailesi (örn. Google); risk oluşturmaz."
+        )
+    else:
+        palette_risk = (
+            best_similarity * 0.7
+            if best_similarity >= PALETTE_SIMILARITY_ALERT_THRESHOLD
+            else 0.0
+        )
+        palette_detail = (
+            f"Renk paleti benzerliği: {best_similarity:.2f}"
+            + (f", en yakın marka: {best_brand}" if best_brand else "")
+            + (
+                ""
+                if best_similarity >= PALETTE_SIMILARITY_ALERT_THRESHOLD
+                else f" (eşik {PALETTE_SIMILARITY_ALERT_THRESHOLD:.2f}, bilgilendirme amaçlı)"
+            )
+        )
 
     signals.append(
         AnalysisSignal(
@@ -1222,15 +1499,7 @@ def visual_analysis(url: str, brand_data: List[Dict[str, Any]]) -> List[Analysis
             value=best_similarity,
             weight=0.7,
             risk_score=palette_risk,
-            details=(
-                f"Renk paleti benzerliği: {best_similarity:.2f}"
-                + (f", en yakın marka: {best_brand}" if best_brand else "")
-                + (
-                    ""
-                    if best_similarity >= PALETTE_SIMILARITY_ALERT_THRESHOLD
-                    else f" (eşik {PALETTE_SIMILARITY_ALERT_THRESHOLD:.2f}, bilgilendirme amaçlı)"
-                )
-            ),
+            details=palette_detail,
         )
     )
 
@@ -1259,16 +1528,21 @@ def risk_assessment(result: AnalysisResult, is_trusted: bool = False) -> Dict[st
         overall = min(1.0, overall * 1.3)
     
     guven_puani = int(round((1 - overall) * 100))
-    
+    guven_puani = max(0, min(100, guven_puani))
+
     if is_trusted:
-        if guven_puani >= 90:
-            guven_puani = 100
-        else:
-            guven_puani = max(95, guven_puani + 10)
-        overall = 1 - (guven_puani / 100)
-        LOGGER.info(f"Bilinen güvenli site bonusu uygulandı. Yeni güven puanı: {guven_puani}")
-    
-    if not is_trusted:
+        guven_puani = 100
+        overall = 0.0
+        LOGGER.info("Bilinen guvenli site: guven puani 100 olarak ayarlandi (site ve uzanti tutarli)")
+
+    # PhishTank veritabanında kayıtlı ise kesin Tehlikeli (güvenilir dış kaynak)
+    phishtank_signal = next((s for s in result.technical_signals if s.name == "phishtank_veritabani"), None)
+    if phishtank_signal and phishtank_signal.risk_score >= 0.9:
+        guven_puani = 0
+        overall = 1.0
+        LOGGER.warning("PhishTank veritabaninda URL tespit edildi; karar Tehlikeli olarak zorlandi.")
+
+    if not is_trusted and not (phishtank_signal and phishtank_signal.risk_score >= 0.9):
         domain_age_signal = next((s for s in result.technical_signals if s.name == "domain_yasi"), None)
         typosquatting_signal = next((s for s in result.technical_signals if s.name == "typosquatting"), None)
         
@@ -1279,6 +1553,14 @@ def risk_assessment(result: AnalysisResult, is_trusted: bool = False) -> Dict[st
             if domain_age is not None and domain_age < 30 and typo_risk >= 0.7:
                 guven_puani = max(0, guven_puani - 20)
                 overall = 1 - (guven_puani / 100)
+
+    # Yüksek typosquatting (marka taklidi) varken "Güvenli" verilmez; en fazla "Şüpheli"
+    typosquatting_signal = next((s for s in result.technical_signals if s.name == "typosquatting"), None)
+    if typosquatting_signal and typosquatting_signal.risk_score >= 0.75:
+        if guven_puani >= 80:
+            guven_puani = 79
+            overall = 0.21
+            LOGGER.info("Yuksek typosquatting tespit edildi; guvenli karari engellendi (en fazla Supheli).")
 
     if guven_puani >= 80:
         karar = "Güvenli"
@@ -1323,6 +1605,7 @@ TRUSTED_DOMAINS = {
     "twitter.com", "x.com",
     "linkedin.com", "linkedin.com.tr",
     "github.com",
+    "github.io",
     "netflix.com", "netflix.com.tr",
     "spotify.com", "spotify.com.tr",
     "paypal.com", "paypal.com.tr",
@@ -1405,7 +1688,13 @@ def is_trusted_domain(url: str) -> bool:
         # 2. Bilinen güvenli subdomain kontrolü
         if domain_lower in TRUSTED_SUBDOMAINS:
             return True
-        
+
+        # 2b. GitHub Pages (*.github.io) - resmi GitHub barindirma, kopya suphesi degil
+        if domain_lower.endswith(".github.io"):
+            return True
+        if domain_lower == "github.io":
+            return True
+
         # 3. Güvenli TLD kontrolü (örn: .k12.tr, .gov.tr, .edu.tr)
         # NOT: TLD kontrolü için subdomain kontrolü yapılmaz, sadece tam eşleşme
         parts = domain_clean.split(".")

@@ -105,7 +105,7 @@ def create_app() -> FastAPI:
 
         response_payload = {
             "url": request.url,
-            "guven_puani": result.get("guven_puani", 0),
+            "guven_puani": int(result.get("guven_puani", 0)),
             "karar": result.get("karar", "Bilinmiyor"),
             "analiz_dokumu": result.get("analiz_dokumu", {}),
             "katman_skorlari": result.get("katman_skorlari", {}),
@@ -140,64 +140,49 @@ if __name__ == "__main__":
         
         # Render.com ve diğer cloud servisler için PORT environment variable'ını kullan
         base_port = int(os.environ.get("PORT", 8000))
-        
-        # Port kullanılabilir mi kontrol et
-        def is_port_available(port):
+        # Cloud ortamında (Render vb.) dışarıdan erişim için 0.0.0.0
+        host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+
+        # Port kullanılabilir mi kontrol et (sadece local'de; cloud'da atla)
+        def is_port_available(port, bind_host="127.0.0.1"):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 try:
-                    s.bind(('127.0.0.1', port))
+                    s.bind((bind_host, port))
                     return True
                 except OSError:
                     return False
-        
-        # Port kullanılabilir değilse alternatif port dene
+
         port = base_port
-        max_attempts = 10
-        attempt = 0
-        
-        while not is_port_available(port) and attempt < max_attempts:
-            attempt += 1
-            port = base_port + attempt
-            if port > 65535:
-                port = 8000 + attempt
-        
-        if not is_port_available(port):
-            print("=" * 60)
-            print("HATA: Uygun port bulunamadı!")
-            print("=" * 60)
-            print(f"Port {base_port} ve alternatifleri kullanımda.")
-            print("Lütfen:")
-            print("1. Başka bir backend sunucusu çalıştırıyorsanız kapatın")
-            print("2. Port kullanan diğer programları kontrol edin")
-            print("3. Bilgisayarı yeniden başlatmayı deneyin")
-            print("=" * 60)
-            sys.stdout.flush()
-            input("Kapatmak için Enter tuşuna basın...")
-            sys.exit(1)
-        
-        if port != base_port:
-            print("=" * 60)
-            print("UYARI: Port 8000 kullanımda!")
-            print(f"Alternatif port kullanılıyor: {port}")
-            print("=" * 60)
-            print()
-        
+        if host == "127.0.0.1":
+            max_attempts = 10
+            attempt = 0
+            while not is_port_available(port) and attempt < max_attempts:
+                attempt += 1
+                port = base_port + attempt
+                if port > 65535:
+                    port = 8000 + attempt
+            if not is_port_available(port):
+                print("=" * 60)
+                print("HATA: Uygun port bulunamadı!")
+                print("=" * 60)
+                sys.stdout.flush()
+                input("Kapatmak için Enter tuşuna basın...")
+                sys.exit(1)
+            if port != base_port:
+                print(f"UYARI: Port {base_port} kullanımda, alternatif: {port}")
+
         print("=" * 60)
         print("Güvenli İnternet Asistanı Backend Sunucusu")
         print("=" * 60)
-        print(f"Sunucu başlatılıyor: http://127.0.0.1:{port}")
+        print(f"Sunucu başlatılıyor: http://{host}:{port}")
         print("Durdurmak için CTRL+C tuşlarına basın")
         print("=" * 60)
-        print()
-        
-        # Konsol penceresinin açık kalması için
         sys.stdout.flush()
         sys.stderr.flush()
-        
-        # PyInstaller için app objesini direkt kullan
+
         uvicorn.run(
-            app,  # Modül string yerine app objesi
-            host="127.0.0.1",
+            app,
+            host=host,
             port=port,
             reload=False,
         )
