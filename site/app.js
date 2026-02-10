@@ -864,7 +864,7 @@ function validateUrl(url) {
     }
 }
 
-function showLocalRunMessage() {
+function showLocalRunMessage(localhostTried) {
     const errorSection = document.getElementById("error");
     const errorMessage = document.getElementById("error-message");
     const resultSection = document.getElementById("result");
@@ -873,8 +873,13 @@ function showLocalRunMessage() {
     if (resultSection) { resultSection.hidden = true; }
     if (errorSection && errorMessage) {
         errorMessage.textContent = "";
-        errorMessage.innerHTML = "Analiz yapmak için projeyi yerel çalıştırmanız gerekir. Backend bu sayfada çalışmaz; GitHub reposunda <strong>backend/</strong> klasörü vardır. " +
-            "<a href=\"" + GITHUB_REPO + "#-hızlı-başlangıç\" target=\"_blank\" rel=\"noopener\">Kurulum adımları (README)</a>.";
+        if (localhostTried) {
+            errorMessage.innerHTML = "Yerel backend'e bağlanılamadı. Lütfen: (1) Backend'in çalıştığından emin olun — <strong>backend</strong> klasöründe <code>python api.py</code> çalıştırın. (2) Sayfayı yenileyin (F5) ve tekrar Analiz Et'e tıklayın. " +
+                "<a href=\"" + GITHUB_REPO + "#-hızlı-başlangıç\" target=\"_blank\" rel=\"noopener\">Kurulum adımları (README)</a>.";
+        } else {
+            errorMessage.innerHTML = "Analiz yapmak için projeyi yerel çalıştırmanız gerekir. Backend bu sayfada çalışmaz; GitHub reposunda <strong>backend/</strong> klasörü vardır. " +
+                "<a href=\"" + GITHUB_REPO + "#-hızlı-başlangıç\" target=\"_blank\" rel=\"noopener\">Kurulum adımları (README)</a>.";
+        }
         errorSection.hidden = false;
         errorSection.style.display = "";
         errorSection.style.visibility = "";
@@ -900,11 +905,11 @@ async function analyzeUrl(url) {
                 detectedApiBase = LOCALHOST_BASE;
                 api = getEffectiveApi();
             } else {
-                showLocalRunMessage();
+                showLocalRunMessage(true);
                 return;
             }
         } catch (_) {
-            showLocalRunMessage();
+            showLocalRunMessage(true);
             return;
         }
     }
