@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Güvenli İnternet Asistanı - Web Arayüzü</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
     <div class="app-wrapper">
@@ -18,30 +19,27 @@
                     <h1>Güvenli İnternet Asistanı</h1>
                     <p class="header-subtitle">Oltalama Saldırılarına Karşı Koruma</p>
                 </div>
+                <button type="button" id="theme-toggle" class="theme-toggle" title="Karanlık / Aydınlık tema" aria-label="Tema değiştir">
+                    <span class="theme-icon theme-icon-sun" aria-hidden="true">☀️</span>
+                    <span class="theme-icon theme-icon-moon" aria-hidden="true">🌙</span>
+                </button>
             </div>
         </header>
 
-        <!-- URL Input Section -->
-        <section id="input-section" class="input-section">
-            <div class="input-container">
-                <div class="input-wrapper">
-                    <input 
-                        type="text" 
-                        id="url-input" 
-                        class="url-input" 
-                        placeholder="Analiz etmek istediğiniz URL'yi girin (örn: https://example.com)"
-                        autocomplete="off"
-                    >
-                    <button id="analyze-button" class="analyze-button">
-                        <span class="button-icon">🔍</span>
-                        <span>Analiz Et</span>
-                    </button>
-                </div>
-                <p class="input-hint">Uzantıyı kurmadan manuel olarak URL analizi yapabilirsiniz</p>
-            </div>
+        <!-- Hero / Tagline -->
+        <section class="hero-section">
+            <p class="hero-tagline">URL'yi girin, teknik, dilsel ve görsel güvenlik analizi anında yapılsın.</p>
         </section>
 
-        <!-- Loading State -->
+        <!-- Yayın sayfasında: Backend repoda, yerel çalıştırma gerekir -->
+        <section id="local-run-banner" class="local-run-banner" hidden>
+            <p class="local-run-text">Analiz motoru bu sayfada çalışmaz; <strong>backend</strong> GitHub reposunda yer alır. Analiz yapmak için projeyi bilgisayarınızda klonlayıp backend'i başlatın ve <code>site/index.html</code> açın.</p>
+            <a id="local-run-repo-link" href="https://github.com/oguzhanbilir/guvenli_internet_asistani#-hızlı-başlangıç" target="_blank" rel="noopener" class="local-run-link">GitHub repo ve kurulum adımları →</a>
+        </section>
+
+        <!-- Main Content (scrollable) -->
+        <main class="main-content">
+        <!-- Loading State (üstte gösterilir) -->
         <section id="status" class="status-section" hidden>
             <div class="loading-container">
                 <div class="spinner"></div>
@@ -49,10 +47,9 @@
                 <p class="loading-subtext">Lütfen bekleyin</p>
             </div>
         </section>
-        
-        <!-- Results Section -->
+
+        <!-- Results Section (üstte gösterilir) -->
         <section id="result" class="result-section" hidden>
-            <!-- Score and URL Card -->
             <div class="score-url-card">
                 <div class="score-url-header">
                     <div class="score-section">
@@ -82,8 +79,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Layer Analysis -->
             <div class="layers-section">
                 <div class="section-header">
                     <span class="section-icon">📊</span>
@@ -91,8 +86,6 @@
                 </div>
                 <div id="layer-container" class="layers-table"></div>
             </div>
-            
-            <!-- Details Section -->
             <details class="details-section">
                 <summary class="details-summary">
                     <span class="details-icon">📋</span>
@@ -104,8 +97,8 @@
                 </div>
             </details>
         </section>
-        
-        <!-- Error Section -->
+
+        <!-- Error Section (üstte gösterilir) -->
         <section id="error" class="error-section" hidden>
             <div class="error-container">
                 <div class="error-icon">⚠️</div>
@@ -117,7 +110,164 @@
                 </button>
             </div>
         </section>
+
+        <!-- URL Input Section (sonuçların altında) -->
+        <section id="input-section" class="input-section">
+            <div class="input-container">
+                <h2 class="section-heading">
+                    <span class="section-heading-icon">🔗</span>
+                    URL Analizi
+                </h2>
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="url-input" 
+                        class="url-input" 
+                        placeholder="Analiz etmek istediğiniz URL'yi girin (örn: https://example.com)"
+                        autocomplete="off"
+                        aria-describedby="url-validation-message"
+                    >
+                    <button id="analyze-button" class="analyze-button">
+                        <span class="button-icon">🔍</span>
+                        <span>Analiz Et</span>
+                    </button>
+                </div>
+                <p id="url-validation-message" class="url-validation-message" role="alert" aria-live="polite"></p>
+                <p class="input-hint">Uzantıyı kurmadan manuel olarak URL analizi yapabilirsiniz</p>
+            </div>
+        </section>
+
+        <!-- Güvenlik Analiz Kapsamı - Kurumsal & anlaşılır -->
+        <section class="features-section">
+            <div class="features-header">
+                <h2 class="features-heading">Güvenlik Analiz Kapsamı</h2>
+                <p class="features-intro">Sistemimiz, girdiğiniz web adresini üç katmanda inceler ve size 0–100 arasında anlaşılır bir güven skoru sunar. Aşağıda bu katmanlarda nelerin kontrol edildiği özetlenmektedir.</p>
+            </div>
+
+            <div class="features-block">
+                <h3 class="features-subhead"><span class="features-subhead-num">1</span> Adres ve sunucu kontrolleri</h3>
+                <p class="features-block-desc">Web adresinin yapısı, güvenlik sertifikası ve adresin kayıtlı olduğu bilinen tehlikeli listeler kontrol edilir.</p>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🔗</span>
+                        <h4 class="feature-title">Adres yapısı</h4>
+                        <p class="feature-desc">Adresin uzunluğu, kullanılan uzantı (.com, .xyz vb.) ve şüpheli kalıplar değerlendirilir.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">✂️</span>
+                        <h4 class="feature-title">Kısaltılmış bağlantılar</h4>
+                        <p class="feature-desc">bit.ly, tinyurl gibi kısaltma servisleri tespit edilir; sahte sitelerde sık kullanıldığı için risk olarak sayılır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🔒</span>
+                        <h4 class="feature-title">Güvenli bağlantı (HTTPS)</h4>
+                        <p class="feature-desc">Sitenin şifreli bağlantı kullanıp kullanmadığı ve sertifika bilgisi kontrol edilir.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">↪️</span>
+                        <h4 class="feature-title">Yönlendirmeler</h4>
+                        <p class="feature-desc">Tıklayınca sizi başka adreslere götüren zincirler; döngü veya şüpheli yönlendirmeler işaretlenir.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">📅</span>
+                        <h4 class="feature-title">Site yaşı</h4>
+                        <p class="feature-desc">Adresin ne zaman kaydedildiği kontrol edilir; çok yeni açılmış siteler daha dikkatli değerlendirilir.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🛡️</span>
+                        <h4 class="feature-title">Tehlikeli liste kontrolü</h4>
+                        <p class="feature-desc">Uluslararası oltalama veritabanında kayıtlı adresler otomatik olarak yüksek riskli sayılır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🔤</span>
+                        <h4 class="feature-title">Benzer yazılan karakterler</h4>
+                        <p class="feature-desc">Adreste, ünlü marka adlarını taklit etmek için kullanılan benzer harfler (farklı alfabelerden) aranır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">✏️</span>
+                        <h4 class="feature-title">Marka taklidi (yazım benzerliği)</h4>
+                        <p class="feature-desc">Bilinen marka adlarına çok benzeyen ama harf farkı olan adresler (örn. rnicrosoft) tespit edilir.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="features-block">
+                <h3 class="features-subhead"><span class="features-subhead-num">2</span> İçerik ve dil kontrolleri</h3>
+                <p class="features-block-desc">Sayfanın metni, oltalama ve dolandırıcılıkta sık kullanılan ifadeler açısından taranır.</p>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">📄</span>
+                        <h4 class="feature-title">Sayfa metni</h4>
+                        <p class="feature-desc">Sitedeki yazılar güvenli bir şekilde alınır ve analiz için kullanılır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">⚠️</span>
+                        <h4 class="feature-title">Riskli ifadeler</h4>
+                        <p class="feature-desc">“Acil”, “hemen tıklayın”, “hesabınız kilitlendi”, “şifrenizi sıfırlayın”, “ödül kazandınız” gibi sık kullanılan dolandırıcılık cümleleri aranır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">📊</span>
+                        <h4 class="feature-title">Dil tabanlı risk puanı</h4>
+                        <p class="feature-desc">Bulunan ifadelere göre bir risk puanı hesaplanır ve diğer katmanlarla birleştirilir.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="features-block">
+                <h3 class="features-subhead"><span class="features-subhead-num">3</span> Görsel ve marka kontrolleri</h3>
+                <p class="features-block-desc">Sayfanın görünümü, bilinen marka logolarına ve renklerine ne kadar benzediği açısından değerlendirilir.</p>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">📸</span>
+                        <h4 class="feature-title">Sayfa görüntüsü</h4>
+                        <p class="feature-desc">Site ekran görüntüsü alınarak görsel analiz için kullanılır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🖼️</span>
+                        <h4 class="feature-title">Logo benzerliği</h4>
+                        <p class="feature-desc">Sitedeki görseller, bilinen marka logolarıyla karşılaştırılarak taklit olup olmadığına bakılır.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🎨</span>
+                        <h4 class="feature-title">Renk kullanımı</h4>
+                        <p class="feature-desc">Sitenin baskın renkleri, bilinen markaların renkleriyle karşılaştırılır; benzerlik risk göstergesi olabilir.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🏷️</span>
+                        <h4 class="feature-title">Marka eşleştirme</h4>
+                        <p class="feature-desc">Logo ve renk veritabanındaki markalarla eşleşme varsa “marka taklidi” uyarısı üretilir.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer">
+            <div class="footer-inner">
+                <div class="footer-block">
+                    <h3 class="footer-title">Nasıl Çalışır?</h3>
+                    <p class="footer-text">Teknik (URL, SSL, typosquatting), dilsel (sosyal mühendislik) ve görsel (marka taklidi) katmanları analiz edilir; güven puanı 0–100 arasında hesaplanır.</p>
+                </div>
+                <div class="footer-block">
+                    <h3 class="footer-title">Bağlantılar</h3>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/oguzhanbilir/guvenli_internet_asistani" target="_blank" rel="noopener">GitHub</a></li>
+                        <li><a href="https://www.youtube.com/watch?v=nvCZ7ITpVVM" target="_blank" rel="noopener">Kullanım Videosu</a></li>
+                    </ul>
+                </div>
+                <div class="footer-block">
+                    <h3 class="footer-title">Proje</h3>
+                    <p class="footer-text">TÜBİTAK 2204-A Lise Öğrencileri Araştırma Projeleri kapsamında geliştirilmiştir.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>Güvenli İnternet Asistanı</span>
+                <span class="footer-sep">·</span>
+                <span>Oltalama saldırılarına karşı çok katmanlı koruma</span>
+            </div>
+        </footer>
     </div>
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>

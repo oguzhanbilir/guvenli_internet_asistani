@@ -1,4 +1,9 @@
-const API_ENDPOINT = "http://localhost:8000/analyze";
+// Backend yalnızca yerel çalıştırmada kullanılır (repo'da backend/ var)
+const IS_LOCAL = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:");
+const API_BASE = IS_LOCAL ? "http://localhost:8000" : "";
+const API_ENDPOINT = API_BASE ? API_BASE + "/analyze" : "";
+const API_HEALTH = API_BASE ? API_BASE + "/health" : "";
+const GITHUB_REPO = "https://github.com/oguzhanbilir/guvenli_internet_asistani";
 
 const LAYER_INFO = {
     teknik: { label: "Teknik Analiz", icon: "🔧", color: "#4299e1" },
@@ -71,9 +76,9 @@ function setStatus(message) {
         resultSection.hidden = true;
     }
     
-    // Input section'ı gizle
+    // Input section üstteki sonuçların altında kalır, gizlenmez
     if (inputSection) {
-        inputSection.hidden = true;
+        inputSection.hidden = false;
     }
     
     // Status section'ı göster
@@ -110,8 +115,9 @@ function updateScoreDisplay(score, decision) {
     const decisionBadge = document.getElementById("decision-badge");
 
     if (scoreValue) {
-        scoreValue.textContent = score ?? "--";
-        scoreValue.setAttribute("data-value", score ?? "--");
+        const displayScore = (score != null && !Number.isNaN(Number(score))) ? Math.round(Number(score)) : (score ?? "--");
+        scoreValue.textContent = displayScore;
+        scoreValue.setAttribute("data-value", displayScore);
     }
 
     if (progressBar) {
@@ -819,10 +825,7 @@ function validateUrl(url) {
         return { valid: false, error: "URL boş olamaz." };
     }
     
-    // URL'yi temizle
     url = url.trim();
-    
-    // http:// veya https:// yoksa ekle
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
     }
@@ -830,10 +833,15 @@ function validateUrl(url) {
     try {
         const urlObj = new URL(url);
         const protocol = urlObj.protocol.toLowerCase();
+        const hostname = urlObj.hostname || "";
         
-        // Sadece http ve https destekleniyor
         if (protocol !== 'http:' && protocol !== 'https:') {
             return { valid: false, error: "Sadece HTTP ve HTTPS protokolleri destekleniyor." };
+        }
+        
+        // Tam domain gerekli: hostname'de en az bir nokta olmalı (örn. apple.com, www.apple.com)
+        if (!hostname.includes(".")) {
+            return { valid: false, error: "Lütfen tam bir web adresi girin (örn: apple.com veya https://www.apple.com). Sadece 'apple' gibi kısa ifadeler geçersizdir." };
         }
         
         return { valid: true, url: url };
@@ -842,9 +850,36 @@ function validateUrl(url) {
     }
 }
 
+function showLocalRunMessage() {
+    const errorSection = document.getElementById("error");
+    const errorMessage = document.getElementById("error-message");
+    const resultSection = document.getElementById("result");
+    const statusSection = document.getElementById("status");
+    if (statusSection) { statusSection.hidden = true; }
+    if (resultSection) { resultSection.hidden = true; }
+    if (errorSection && errorMessage) {
+        errorMessage.textContent = "";
+        errorMessage.innerHTML = "Analiz yapmak için projeyi yerel çalıştırmanız gerekir. Backend bu sayfada çalışmaz; GitHub reposunda <strong>backend/</strong> klasörü vardır. " +
+            "<a href=\"" + GITHUB_REPO + "#-hızlı-başlangıç\" target=\"_blank\" rel=\"noopener\">Kurulum adımları (README)</a>.";
+        errorSection.hidden = false;
+        errorSection.style.display = "";
+        errorSection.style.visibility = "";
+        errorSection.style.opacity = "";
+        errorSection.style.height = "";
+    }
+    const appWrapper = document.querySelector('.app-wrapper');
+    if (appWrapper) appWrapper.classList.add('show-error');
+}
+
 async function analyzeUrl(url) {
     currentUrl = url;
     resultsShown = false;
+    
+    // Yayın sayfasındaysak (GitHub Pages) backend yok; yerel çalıştırma mesajı
+    if (!API_BASE) {
+        showLocalRunMessage();
+        return;
+    }
     
     // Önceki watcher'ı temizle
     if (window.errorWatcher) {
@@ -925,12 +960,12 @@ async function analyzeUrl(url) {
     };
 
     // Önce backend'in çalışıp çalışmadığını kontrol et
-    fetchWithTimeout("http://localhost:8000/health", {
+    fetchWithTimeout(API_HEALTH, {
         method: "GET"
     }, 5000) // Health check için 5 saniye timeout
     .then(response => {
         if (!response.ok) {
-            throw new Error("Backend sunucusu yanıt vermiyor. Lütfen:\n1. Backend sunucusunu çalıştırdığınızdan emin olun\n2. Sunucunun http://localhost:8000 adresinde çalıştığını kontrol edin\n3. Tarayıcı konsolunu (F12) açıp hata mesajlarını kontrol edin");
+            throw new Error("Backend sunucusu yanıt vermiyor. Lütfen:\n1. Backend sunucusunun çalıştığından emin olun\n2. Tarayıcı konsolunu (F12) açıp hata mesajlarını kontrol edin");
         }
         return response.json();
     })
@@ -979,7 +1014,7 @@ async function analyzeUrl(url) {
             
             // Network hataları için özel mesajlar
             if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("ERR_CONNECTION_REFUSED") || errorMessage.includes("zaman aşımına uğradı")) {
-                errorMessage = "Backend sunucusuna bağlanılamıyor. Lütfen:\n1. Backend sunucusunu çalıştırdığınızdan emin olun\n2. Sunucunun http://localhost:8000 adresinde çalıştığını kontrol edin\n3. Tarayıcı konsolunu (F12) açıp hata mesajlarını kontrol edin\n4. Firewall ayarlarınızı kontrol edin";
+                errorMessage = "Backend sunucusuna bağlanılamıyor. Lütfen sayfayı yenileyip tekrar deneyin veya tarayıcı konsolunu (F12) kontrol edin.";
             } else if (errorMessage.includes("timeout") || errorMessage.includes("timed out")) {
                 errorMessage = "İstek zaman aşımına uğradı. Backend sunucusu yanıt vermiyor. Lütfen:\n1. Backend sunucusunun çalıştığından emin olun\n2. İnternet bağlantınızı kontrol edin\n3. Tekrar deneyin";
             } else if (errorMessage.includes("CORS")) {
@@ -995,6 +1030,13 @@ async function analyzeUrl(url) {
 }
 
 function init() {
+    initThemeToggle();
+    if (!IS_LOCAL) {
+        const banner = document.getElementById("local-run-banner");
+        const repoLink = document.getElementById("local-run-repo-link");
+        if (banner) banner.hidden = false;
+        if (repoLink) repoLink.href = GITHUB_REPO + "#-hızlı-başlangıç";
+    }
     const retryButton = document.getElementById("retry-button");
     if (retryButton) {
         retryButton.addEventListener("click", () => {
@@ -1017,38 +1059,60 @@ function init() {
 
     const analyzeButton = document.getElementById("analyze-button");
     const urlInput = document.getElementById("url-input");
-    
+    const validationMessageEl = document.getElementById("url-validation-message");
+
+    function showUrlValidationMessage(msg) {
+        if (validationMessageEl) validationMessageEl.textContent = msg || "";
+        if (urlInput) urlInput.classList.add("is-invalid");
+    }
+    function clearUrlValidationMessage() {
+        if (validationMessageEl) validationMessageEl.textContent = "";
+        if (urlInput) urlInput.classList.remove("is-invalid");
+    }
+
     if (analyzeButton && urlInput) {
+        // URL girerken validation (blur ve input)
+        urlInput.addEventListener("blur", () => {
+            const v = urlInput.value.trim();
+            if (!v) {
+                clearUrlValidationMessage();
+                return;
+            }
+            const validation = validateUrl(v);
+            if (validation.valid) clearUrlValidationMessage();
+            else showUrlValidationMessage(validation.error);
+        });
+        urlInput.addEventListener("input", () => {
+            clearUrlValidationMessage();
+        });
+
         // Enter tuşu ile analiz başlat
         urlInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") {
                 analyzeButton.click();
             }
         });
-        
+
         // Analiz butonu tıklama
         analyzeButton.addEventListener("click", () => {
             const urlValue = urlInput.value.trim();
-            
+            clearUrlValidationMessage();
+
             if (!urlValue) {
-                showError(new Error("Lütfen bir URL girin."));
+                showUrlValidationMessage("Lütfen bir URL girin.");
                 return;
             }
-            
-            // URL doğrulama
+
             const validation = validateUrl(urlValue);
             if (!validation.valid) {
-                showError(new Error(validation.error));
+                showUrlValidationMessage(validation.error);
                 return;
             }
-            
-            // Butonu devre dışı bırak
+
             analyzeButton.disabled = true;
             analyzeButton.textContent = "Analiz Ediliyor...";
-            
-            // Analiz başlat
+
             analyzeUrl(validation.url).finally(() => {
-                // Butonu tekrar etkinleştir
                 analyzeButton.disabled = false;
                 analyzeButton.innerHTML = '<span class="button-icon">🔍</span><span>Analiz Et</span>';
             });
@@ -1056,9 +1120,29 @@ function init() {
     }
 }
 
+// Tema (karanlık/aydınlık) - sayfa yüklenmeden önce uygula (titreme önlemi)
+(function applySavedTheme() {
+    try {
+        const saved = localStorage.getItem("theme");
+        if (saved === "dark") document.documentElement.classList.add("theme-dark");
+        else document.documentElement.classList.remove("theme-dark");
+    } catch (e) {}
+})();
+
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
 } else {
     init();
+}
+
+function initThemeToggle() {
+    const btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+        const isDark = document.documentElement.classList.toggle("theme-dark");
+        try {
+            localStorage.setItem("theme", isDark ? "dark" : "light");
+        } catch (e) {}
+    });
 }
 
