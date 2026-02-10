@@ -1,9 +1,12 @@
-// Backend yalnızca yerel çalıştırmada kullanılır (repo'da backend/ var)
+// Backend: yerel veya file:// ise localhost; GitHub Pages'te açıksa "Analiz Et"e basınca localhost denenir
 const IS_LOCAL = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:");
 const API_BASE = IS_LOCAL ? "http://localhost:8000" : "";
 const API_ENDPOINT = API_BASE ? API_BASE + "/analyze" : "";
 const API_HEALTH = API_BASE ? API_BASE + "/health" : "";
 const GITHUB_REPO = "https://github.com/oguzhanbilir/guvenli_internet_asistani";
+const LOCALHOST_BASE = "http://localhost:8000";
+// GitHub Pages'ten site açıksa ve PC'de backend çalışıyorsa bu session'da kullanılacak base (runtime'da set edilir)
+let detectedApiBase = "";
 
 const LAYER_INFO = {
     teknik: { label: "Teknik Analiz", icon: "🔧", color: "#4299e1" },
@@ -13,6 +16,16 @@ const LAYER_INFO = {
 
 let currentUrl = "";
 let resultsShown = false;
+
+// Kullanılacak API: yerel tanımlı veya daha önce tespit edilmiş localhost
+function getEffectiveApi() {
+    const base = API_BASE || detectedApiBase;
+    return {
+        base,
+        endpoint: base ? base + "/analyze" : "",
+        health: base ? base + "/health" : ""
+    };
+}
 
 // Cache ayarları
 const CACHE_DURATION = 5 * 60 * 1000; // 5 dakika (milisaniye)
@@ -120,24 +133,26 @@ function updateScoreDisplay(score, decision) {
         scoreValue.setAttribute("data-value", displayScore);
     }
 
+    // Puana göre tek band: 0-39 Tehlikeli, 40-79 Şüpheli, 80-100 Güvenli (çubuk + etiket + metin aynı)
+    const scoreNum = (score != null && !Number.isNaN(Number(score))) ? Math.round(Number(score)) : 0;
+    const band = scoreNum >= 80 ? "Güvenli" : scoreNum >= 40 ? "Şüpheli" : "Tehlikeli";
+
     if (progressBar) {
         const percentage = Math.max(0, Math.min(100, score ?? 0));
         progressBar.style.width = `${percentage}%`;
-        
         progressBar.className = "progress-fill";
-        if (percentage < 40) {
+        if (scoreNum < 40) {
             progressBar.classList.add("low");
-        } else if (percentage < 70) {
+        } else if (scoreNum < 80) {
             progressBar.classList.add("medium");
         } else {
             progressBar.classList.remove("low", "medium");
         }
     }
 
-    // Decision badge
+    // Decision badge ve metin: puana göre aynı band
     if (decisionBadge) {
         decisionBadge.className = "decision-badge";
-        const scoreNum = score ?? 0;
         if (scoreNum >= 80) {
             decisionBadge.classList.add("safe");
             if (decisionIcon) decisionIcon.textContent = "✅";
@@ -149,9 +164,8 @@ function updateScoreDisplay(score, decision) {
             if (decisionIcon) decisionIcon.textContent = "🚨";
         }
     }
-
     if (decisionText) {
-        decisionText.textContent = decision || "Bilinmiyor";
+        decisionText.textContent = band;
     }
 }
 
@@ -874,13 +888,27 @@ function showLocalRunMessage() {
 async function analyzeUrl(url) {
     currentUrl = url;
     resultsShown = false;
-    
-    // Yayın sayfasındaysak (GitHub Pages) backend yok; yerel çalıştırma mesajı
-    if (!API_BASE) {
-        showLocalRunMessage();
-        return;
+
+    // Önce kullanılacak API'yi belirle: yerel tanımlı veya daha önce tespit edilmiş localhost
+    let api = getEffectiveApi();
+    // GitHub Pages'te açıksak ve henüz localhost denemediysek, önce localhost'u dene
+    if (!api.base) {
+        setStatus("Backend kontrol ediliyor...");
+        try {
+            const healthRes = await fetch(LOCALHOST_BASE + "/health", { method: "GET" });
+            if (healthRes && healthRes.ok) {
+                detectedApiBase = LOCALHOST_BASE;
+                api = getEffectiveApi();
+            } else {
+                showLocalRunMessage();
+                return;
+            }
+        } catch (_) {
+            showLocalRunMessage();
+            return;
+        }
     }
-    
+
     // Önceki watcher'ı temizle
     if (window.errorWatcher) {
         clearInterval(window.errorWatcher);
@@ -960,7 +988,8 @@ async function analyzeUrl(url) {
     };
 
     // Önce backend'in çalışıp çalışmadığını kontrol et
-    fetchWithTimeout(API_HEALTH, {
+    const apiFinal = getEffectiveApi();
+    fetchWithTimeout(apiFinal.health, {
         method: "GET"
     }, 5000) // Health check için 5 saniye timeout
     .then(response => {
@@ -971,7 +1000,7 @@ async function analyzeUrl(url) {
     })
     .then(() => {
         // Backend çalışıyor, analiz isteğini gönder
-        return fetchWithTimeout(API_ENDPOINT, {
+        return fetchWithTimeout(apiFinal.endpoint, {
             method: "POST",
             body: JSON.stringify({
                 url: url,
@@ -1033,9 +1062,20 @@ function init() {
     initThemeToggle();
     if (!IS_LOCAL) {
         const banner = document.getElementById("local-run-banner");
+        const connectedBanner = document.getElementById("backend-connected-banner");
         const repoLink = document.getElementById("local-run-repo-link");
-        if (banner) banner.hidden = false;
         if (repoLink) repoLink.href = GITHUB_REPO + "#-hızlı-başlangıç";
+        if (banner) banner.hidden = false;
+        // Site GitHub'da, giriş PC'den: açık olan yerel backend'e bağlan
+        fetch(LOCALHOST_BASE + "/health", { method: "GET" })
+            .then(r => {
+                if (r && r.ok) {
+                    detectedApiBase = LOCALHOST_BASE;
+                    if (banner) banner.hidden = true;
+                    if (connectedBanner) connectedBanner.hidden = false;
+                }
+            })
+            .catch(() => {});
     }
     const retryButton = document.getElementById("retry-button");
     if (retryButton) {

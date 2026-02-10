@@ -66,6 +66,7 @@ class AnalyzeResponse(BaseModel):
     analiz_dokumu: Dict[str, str]
     katman_skorlari: Dict[str, float]
     detaylı_sinyaller: Dict[str, Any]
+    uyari: Optional[str] = None  # İçerik alınamadığında arayüzde "Analiz yapılamadı" gösterilir
 
 
 def create_app() -> FastAPI:
@@ -75,9 +76,18 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     
+    # GitHub Pages ve yerel PC'den (localhost / file) gelen isteklere izin ver
+    allow_origins = [
+        "https://oguzhanbilir.github.io",
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "null",  # file:// açıldığında origin
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -85,10 +95,19 @@ def create_app() -> FastAPI:
 
     @app.post("/analyze", response_model=AnalyzeResponse)
     async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+        from urllib.parse import urlparse
         url_str = str(request.url)
-        LOGGER.info("URL analizi başlatıldı: %s", url_str)
+        # Site ve uzantı aynı sonucu alsın: tek biçim (trailing slash, host küçük)
+        parsed = urlparse(url_str)
+        netloc = (parsed.netloc or "").lower()
+        path = (parsed.path or "/").rstrip("/") or "/"
+        path = path or "/"
+        url_normalized = f"{parsed.scheme or 'https'}://{netloc}{path}"
+        if parsed.query:
+            url_normalized += "?" + parsed.query
+        LOGGER.info("URL analizi başlatıldı: %s", url_normalized)
         try:
-            result = analyze_url(url_str, include_visual=request.include_visual)
+            result = analyze_url(url_normalized, include_visual=request.include_visual)
             LOGGER.info("Analiz tamamlandı. Güven puanı: %s", result.get("guven_puani"))
         except Exception as exc:
             import traceback
@@ -110,6 +129,7 @@ def create_app() -> FastAPI:
             "analiz_dokumu": result.get("analiz_dokumu", {}),
             "katman_skorlari": result.get("katman_skorlari", {}),
             "detaylı_sinyaller": result.get("detaylı_sinyaller", {}),
+            "uyari": result.get("uyari"),
         }
         return AnalyzeResponse(**response_payload)
 
@@ -140,8 +160,12 @@ if __name__ == "__main__":
         
         # Render.com ve diğer cloud servisler için PORT environment variable'ını kullan
         base_port = int(os.environ.get("PORT", 8000))
-        # Cloud ortamında (Render vb.) dışarıdan erişim için 0.0.0.0
-        host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+        # Tablet/telefondan aynı WiFi'de erişim: HOST=0.0.0.0 veya ENABLE_LAN=1 ile çalıştır
+        host = "0.0.0.0" if (
+            os.environ.get("PORT") or
+            os.environ.get("HOST") == "0.0.0.0" or
+            os.environ.get("ENABLE_LAN", "").lower() in ("1", "true", "yes")
+        ) else "127.0.0.1"
 
         # Port kullanılabilir mi kontrol et (sadece local'de; cloud'da atla)
         def is_port_available(port, bind_host="127.0.0.1"):
@@ -175,6 +199,16 @@ if __name__ == "__main__":
         print("Güvenli İnternet Asistanı Backend Sunucusu")
         print("=" * 60)
         print(f"Sunucu başlatılıyor: http://{host}:{port}")
+        if host == "0.0.0.0":
+            try:
+                import socket
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                lan_ip = s.getsockname()[0]
+                s.close()
+                print(f"Tablet/telefondan (aynı WiFi): http://{lan_ip}:{port}")
+            except Exception:
+                pass
         print("Durdurmak için CTRL+C tuşlarına basın")
         print("=" * 60)
         sys.stdout.flush()

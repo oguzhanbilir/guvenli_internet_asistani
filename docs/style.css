@@ -360,6 +360,22 @@ body::before {
     color: var(--primary);
 }
 
+.backend-connected-banner {
+    max-width: 1400px;
+    margin: 0 auto 16px;
+    padding: 12px 20px;
+    background: rgba(56, 239, 125, 0.12);
+    border: 1px solid rgba(56, 239, 125, 0.35);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+.backend-connected-banner .backend-connected-text {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
 /* ===== Main Content (scrollable) ===== */
 .main-content {
     flex: 1;
