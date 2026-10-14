@@ -28,7 +28,7 @@
 - **Linguistic:** fetches the page and scans the text for social engineering phrases
 - **Visual:** takes a headless Selenium screenshot and compares it to known brand logos (perceptual hash) and color palettes (K-Means)
 
-Stack: Python, FastAPI, BeautifulSoup, Selenium, imagehash, scikit-learn, a Chrome extension (Manifest V3) and a web UI on GitHub Pages. Built with high school students for TÜBİTAK 2204-A, where it placed 2nd in the Adana regional exhibition.
+Stack: Python, FastAPI, BeautifulSoup, Selenium, imagehash, scikit-learn, a Chrome extension (Manifest V3) and a web UI on GitHub Pages. Built with high school students for TÜBİTAK 2204-A, where it placed 2nd in the Adana regional exhibition. Advisor: Oğuzhan Bilir.
 
 The full documentation below is in Turkish. API docs: run the backend and open `/docs`.
 
@@ -190,4 +190,4 @@ curl -X POST http://127.0.0.1:8000/analyze -H "Content-Type: application/json" -
 
 ## 📄 Lisans ve Not
 
-Bu proje **TÜBİTAK 2204-A Lise Öğrencileri Araştırma Projeleri** kapsamında geliştirilmiştir. Örnek veri dosyaları ve referans yapıları depoda paylaşılmaktadır.
+Bu proje **TÜBİTAK 2204-A Lise Öğrencileri Araştırma Projeleri** kapsamında geliştirilmiştir. Proje danışmanı: Oğuzhan Bilir. Örnek veri dosyaları ve referans yapıları depoda paylaşılmaktadır.
