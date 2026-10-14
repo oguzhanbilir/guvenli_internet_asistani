@@ -20,6 +20,20 @@
 
 ---
 
+## 🇬🇧 In English
+
+**Safe Internet Assistant** is a phishing detection system that scores a URL across three layers:
+
+- **Technical:** PhishTank lookup, URL structure, SSL, redirects, WHOIS domain age, Unicode homographs, and typosquatting against a brand list (Levenshtein distance)
+- **Linguistic:** fetches the page and scans the text for social engineering phrases
+- **Visual:** takes a headless Selenium screenshot and compares it to known brand logos (perceptual hash) and color palettes (K-Means)
+
+Stack: Python, FastAPI, BeautifulSoup, Selenium, imagehash, scikit-learn, a Chrome extension (Manifest V3) and a web UI on GitHub Pages. Built with high school students for TÜBİTAK 2204-A, where it placed 2nd in the Adana regional exhibition.
+
+The full documentation below is in Turkish. API docs: run the backend and open `/docs`.
+
+---
+
 ## 📌 Proje Hakkında
 
 Güvenli İnternet Asistanı, **teknik**, **dilsel** ve **görsel** analiz katmanlarını bir araya getiren hibrit bir güvenlik sistemidir. URL yapısı, metin içeriği ve görsel taklit (marka logoları) analizi ile hem geleneksel hem de gelişmiş oltalama saldırılarına karşı koruma sağlar. Aşağıda her katmandaki adımlar ve kullanılan yöntemler detaylıca açıklanmaktadır.
