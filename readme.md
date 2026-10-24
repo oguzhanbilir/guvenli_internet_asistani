@@ -1,193 +1,72 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Chrome_Extension-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome Extension">
-</p>
+English | [Türkçe](README.tr.md)
 
-<h1 align="center">🛡️ Güvenli İnternet Asistanı</h1>
-<p align="center">
-  <strong>Oltalama (phishing) saldırılarına karşı çok katmanlı koruma</strong>
-</p>
-<p align="center">
-  <a href="https://oguzhanbilir.github.io/guvenli_internet_asistani/">🌐 Canlı Web Arayüzü</a>
-  &nbsp;•&nbsp;
-  <a href="https://www.youtube.com/watch?v=nvCZ7ITpVVM">▶️ Kullanım Videosu</a>
-  &nbsp;•&nbsp;
-  <a href="#-hızlı-başlangıç">Kurulum</a>
-  &nbsp;•&nbsp;
-  <a href="#-proje-yapısı">Yapı</a>
-</p>
+# Secure Internet Assistant
 
----
+Phishing detection that scores a URL on three layers: technical, linguistic and visual. It comes with a FastAPI backend, a Chrome extension and a web interface.
 
-## 🇬🇧 In English
+**TÜBİTAK 2204-A** · 2nd place, Adana regional exhibition (Feb 2026)
 
-**Safe Internet Assistant** is a phishing detection system that scores a URL across three layers:
+[Web interface](https://oguzhanbilir.github.io/guvenli_internet_asistani/) · [Demo video (Turkish)](https://www.youtube.com/watch?v=nvCZ7ITpVVM)
 
-- **Technical:** PhishTank lookup, URL structure, SSL, redirects, WHOIS domain age, Unicode homographs, and typosquatting against a brand list (Levenshtein distance)
-- **Linguistic:** fetches the page and scans the text for social engineering phrases
-- **Visual:** takes a headless Selenium screenshot and compares it to known brand logos (perceptual hash) and color palettes (K-Means)
+## How a URL is scored
 
-Stack: Python, FastAPI, BeautifulSoup, Selenium, imagehash, scikit-learn, a Chrome extension (Manifest V3) and a web UI on GitHub Pages. Built with high school students for TÜBİTAK 2204-A, where it placed 2nd in the Adana regional exhibition. Advisor: Oğuzhan Bilir.
+You only enter a URL. The backend does the rest.
 
-The full documentation below is in Turkish. API docs: run the backend and open `/docs`.
+| Layer | Opens the page? | Checks |
+|-------|-----------------|--------|
+| Technical | No | PhishTank lookup, URL structure and suspicious TLDs, URL shorteners, SSL, redirect chain, WHOIS domain age, Unicode homographs and ASCII lookalikes (`rn` → `m`, `0` → `o`), typosquatting against a brand list with Levenshtein distance |
+| Linguistic | Yes, with `requests` | Extracts the page text with BeautifulSoup and looks for social engineering phrases ("urgent", "your account has been suspended", "you won a prize") |
+| Visual | Yes, headless browser | Takes a Selenium screenshot, compares it to known brand logos with perceptual hash and Hamming distance, and compares dominant colours (K-Means) with brand palettes |
 
----
+The three scores are combined into one weighted risk score. If a page can't be fetched, the linguistic layer runs with less data and the decision leans on the other layers. The visual layer can be turned off with `include_visual: false`.
 
-## 📌 Proje Hakkında
+URLs listed in [PhishTank](https://phishtank.org/) are marked dangerous straight away. For a higher rate limit, set a free API key in `PHISHTANK_APP_KEY`.
 
-Güvenli İnternet Asistanı, **teknik**, **dilsel** ve **görsel** analiz katmanlarını bir araya getiren hibrit bir güvenlik sistemidir. URL yapısı, metin içeriği ve görsel taklit (marka logoları) analizi ile hem geleneksel hem de gelişmiş oltalama saldırılarına karşı koruma sağlar. Aşağıda her katmandaki adımlar ve kullanılan yöntemler detaylıca açıklanmaktadır.
+## Quick start
 
----
-
-### 🔧 Teknik Analiz Katmanı
-
-Bu katman, URL ve domain üzerinde kural tabanlı ve benzerlik tabanlı kontroller yapar.
-
-| Adım | Açıklama |
-|------|----------|
-| **URL yapısı** | Domain uzunluğu, subdomain sayısı, path/query uzunluğu, standart dışı port kullanımı; şüpheli TLD listesi (.xyz, .work, .click vb.) ile karşılaştırma. |
-| **Kısaltılmış URL** | Bilinen kısaltma servisleri (bit.ly, tinyurl.com, t.co vb.) tespit edilir; oltalama için sık kullanıldığından risk skoruna yansır. |
-| **SSL/TLS** | HTTPS kullanımı, sertifika varlığı ve bağlantı güvenliği kontrol edilir. |
-| **Yönlendirme** | HTTP/HTTPS yönlendirme zinciri izlenir; döngüsel veya şüpheli yönlendirmeler işaretlenir. |
-| **Domain yaşı (WHOIS)** | Mümkünse domain kayıt tarihi alınır; çok yeni domainler (örn. 30 gün altı) düşük güven sinyali üretir. |
-| **Homografik karakterler** | **Unicode homograf:** Farklı alfabelerden görünümde benzer karakterler (Kiril `а` vs Latin `a`, Yunan `ο` vs Latin `o`) tespit edilir. **ASCII lookalike:** `rn`→`m`, `vv`→`w`, `0`→`o`, `1`→`l` gibi diziler normalize edilip bilinen marka domain’leriyle karşılaştırılır; eşleşme varsa yüksek risk. |
-| **Typosquatting** | Domain (ve tireyle ayrılmış segmentler) bilgi bankasındaki marka domain’leriyle **Levenshtein mesafesi** ile karşılaştırılır; mesafe ≤2 ve substring/benzerlik koşulları typosquatting riski üretir. Böylece `rnicrosoft-login.com` gibi adresler `microsoft.com` ile eşleştirilerek tehlikeli sınıfına çekilir. |
-
-**Yapay zeka / benzerlik teknikleri (teknik katmanda):** Statik homograf eşleme tablolarına ek olarak, domain segmentleri normalize edilip marka listesiyle hem tam eşleşme hem de **Levenshtein** ile benzerlik kontrolü yapılır; eşik değerleri (örn. mesafe ≤2) ve ağırlıklar risk puanına entegre edilir.
-
----
-
-### 📝 Dilsel Analiz Katmanı
-
-Sayfa içeriğindeki metin, sosyal mühendislik ve oltalama diline göre analiz edilir.
-
-| Adım | Açıklama |
-|------|----------|
-| **İçerik çekme** | Hedef URL’e HTTP/HTTPS isteği atılarak HTML alınır; BeautifulSoup ile metin çıkarılır. |
-| **Anahtar ifadeler** | “Acil”, “hemen”, “hesabınız askıya alındı”, “şifreniz sıfırlandı”, “ödül kazandınız”, “doğrulama gerekli” gibi sosyal mühendislik ifadeleri aranır. |
-| **Risk puanlama** | Tespit edilen ifade sayısı ve türüne göre dilsel risk skoru hesaplanır; teknik ve görsel skorlarla birleştirilir. |
-
-**Not:** İçerik alınamazsa (timeout, 403, 503 vb.) dilsel katman düşük veriyle çalışır; sistem yine de URL ve diğer katmanlara dayanarak karar üretir.
-
----
-
-### 👁️ Görsel Analiz Katmanı
-
-Sayfanın ekran görüntüsü ve görsel öğeleri, marka taklidi tespiti için kullanılır.
-
-| Adım | Açıklama |
-|------|----------|
-| **Ekran görüntüsü** | Selenium ile sayfa açılır ve tam sayfa veya viewport screenshot alınır. |
-| **Algısal hash (pHash)** | Görüntüden **perceptual hash** (imagehash kütüphanesi) çıkarılır; bilinen marka logolarının hash’leriyle **Hamming mesafesi** hesaplanır. Düşük mesafe = yüksek görsel benzerlik, marka taklidi riski. |
-| **Renk paleti** | Görüntüden renkler örneklenir; **K-Means** ile baskın renk kümeleri çıkarılır ve bilinen marka renk paletleriyle karşılaştırılır. Benzer palet, marka taklidini destekleyen bir sinyal üretir. |
-| **Marka eşleştirme** | Bilgi bankasındaki markaların logo hash’leri ve renk paletleriyle karşılaştırma yapılır; eşik aşımında “marka taklidi” uyarısı risk skoruna eklenir. |
-
-**Yapay zeka / görsel teknikler:** pHash ile görsel parmak izi, Hamming mesafesi ile benzerlik; K-Means ile renk kümeleme ve palet karşılaştırması. İsteğe bağlı görsel analiz kapatılarak yalnızca teknik + dilsel katmanla da çalışılabilir.
-
----
-
-### Özet tablo
-
-| Özellik | Kısa açıklama |
-|--------|----------------|
-| 🔧 **Teknik analiz** | **PhishTank** veritabanı kontrolü, URL yapısı, SSL, yönlendirme, homografik karakterler, typosquatting (Levenshtein + marka listesi), domain yaşı, kısaltılmış URL. |
-| 📝 **Dilsel analiz** | Sayfa metninden sosyal mühendislik anahtar ifadelerinin taranması ve risk puanlaması. |
-| 👁️ **Görsel analiz** | Logo benzerliği (pHash + Hamming), marka taklidi tespiti, renk paleti (K-Means) karşılaştırması. |
-
-**PhishTank entegrasyonu:** [PhishTank](https://phishtank.org/) (Cisco Talos) veritabanında kayıtlı URL’ler otomatik **Tehlikeli** sayılır. Daha yüksek istek limiti için [ücretsiz API anahtarı](https://phishtank.org/api_register.php) alıp `PHISHTANK_APP_KEY` ortam değişkenine atayabilirsiniz.
-
----
-
-### 🔍 Analiz nasıl yapılıyor? (Sadece URL mi, sayfa açılıyor mu?)
-
-Sitede **sadece URL giriyorsunuz**; arka planda backend şunları yapıyor:
-
-| Katman | Sayfa açılıyor mu? | Nasıl? |
-|--------|--------------------|--------|
-| **Teknik analiz** | **Hayır** | URL ve domain üzerinden: PhishTank API, WHOIS, SSL, TLD, homograf/typosquatting. Sayfa içeriği veya ekran görüntüsü gerekmez. |
-| **Dilsel analiz** | **Evet** | Backend, girilen URL’e **HTTP isteği (GET)** atar; dönen HTML’den metin çıkarılır (BeautifulSoup). Bu metin üzerinde sosyal mühendislik anahtar kelimeleri taranır. Yani sayfa **sunucu tarafında açılıp okunuyor**. |
-| **Görsel analiz** | **Evet** | Backend **headless tarayıcı** (Chrome veya Firefox) açar, URL’i yükler ve **ekran görüntüsü** alır. Bu görüntü üzerinde logo benzerliği (pHash) ve renk paleti (K-Means) hesaplanır. |
-
-**Özet:** Dilsel ve görsel analiz için sayfa **arka planda** açılıyor: önce `requests.get(url)` ile içerik indiriliyor (dilsel), sonra Selenium ile sayfa açılıp screenshot alınıyor (görsel). Kullanıcı sadece URL’i girer; tüm erişim backend sunucusundan yapılır. Görsel analiz isteğe bağlı kapatılabiliyorsa (`include_visual: false`) yalnızca teknik + dilsel çalışır; ekran görüntüsü alınmaz.
-
----
-
-## ▶️ Kullanım Videosu
-
-Projenin kurulumu ve kullanımı için [YouTube kullanım videosu](https://www.youtube.com/watch?v=nvCZ7ITpVVM) izleyebilirsiniz.
-
----
-
-## 🚀 Hızlı Başlangıç
-
-### Gereksinimler
-- **Python 3.11+**
-- **Chrome** (uzantı için)
-
-### 1. Backend’i çalıştırma
+Requires Python 3.11+ and Chrome.
 
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate        # source venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
 python api.py
 ```
 
-Sunucu varsayılan olarak **http://127.0.0.1:8000** adresinde çalışır.
+The API runs at http://127.0.0.1:8000 and the Swagger docs at `/docs`.
 
-**Tablet veya telefondan (aynı WiFi):** Backend’i yerel ağda açmak için `backend` klasöründe `calistir_tablet_icin.bat` çalıştırın veya `set ENABLE_LAN=1` ile `python api.py` verin. Bilgisayarınızın IP’sini (örn. 192.168.1.5) öğrenin; tablette tarayıcıda `http://192.168.1.5:8000/docs` veya site/uzantıda API adresi olarak `http://192.168.1.5:8000` kullanın.
+- **Web interface:** open `site/index.html` while the backend runs, or use the GitHub Pages version
+- **Chrome extension:** load `frontend_extension` with "Load unpacked" on `chrome://extensions`
+- **Same Wi-Fi from a tablet or phone:** run `calistir_tablet_icin.bat` in `backend`, or start with `ENABLE_LAN=1`, then point the site or extension to `http://<your-ip>:8000`
+- **Deploy:** `render.yaml` works as a Render Blueprint. On Railway or Fly.io use `uvicorn api:app --host 0.0.0.0 --port $PORT` with `backend/` as root
 
-### 2. Kullanım seçenekleri
+## API
 
-- **Web arayüzü:** Backend çalışırken tarayıcıda `site/index.html` açın veya [GitHub Pages](https://oguzhanbilir.github.io/guvenli_internet_asistani/) üzerinden kullanın.
-- **Chrome uzantısı:** `frontend_extension` klasörünü Chrome’da “Paketlenmemiş uzantı yükle” ile ekleyin.
-
-### 3. Backend'i Render'da çalıştırma
-
-- **Render:** Depoyu GitHub’a atıp [Render](https://render.com) → **Blueprint** ile `render.yaml` kullanın. Backend URL’i (örn. `https://guvenli-internet-asistani-api.onrender.com`) web/uzantıda API adresi yapın.
-- **Alternatif (Railway, Fly.io):** Backend’i Python web servisi olarak deploy edebilirsiniz; start komutu `uvicorn api:app --host 0.0.0.0 --port $PORT`, root `backend/`.  
-Her iki durumda da tablet/telefon, siteyi nerede açarsa açsın (GitHub Pages veya yerel) backend bu public URL’e istek atar.
-
----
-
-## 📁 Proje Yapısı
-
-```
-├── backend/           # API ve analiz motoru (FastAPI, Python)
-├── frontend_extension/ # Chrome uzantısı (Manifest V3)
-├── site/              # Web arayüzü kaynak kodu
-├── docs/              # GitHub Pages için yayınlanan site
-└── data/              # Örnek veri setleri
-```
-
----
-
-## 🔌 API
-
-| Endpoint | Açıklama |
-|----------|----------|
-| `GET /health` | Sunucu sağlık kontrolü |
-| `POST /analyze` | URL analizi (JSON: `{"url": "https://..."}`) |
-| `/docs` | Swagger UI (interaktif API dokümantasyonu) |
-
-**Örnek istek:**
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Health check |
+| `POST /analyze` | Analyse a URL, body `{"url": "https://..."}` |
+| `/docs` | Swagger UI |
 
 ```bash
 curl -X POST http://127.0.0.1:8000/analyze -H "Content-Type: application/json" -d "{\"url\": \"https://example.com\"}"
 ```
 
----
+## Project structure
 
-## 🛠️ Kullanılan Teknolojiler
+```
+backend/             API and analysis engine (FastAPI)
+frontend_extension/  Chrome extension (Manifest V3)
+site/                Web interface source
+docs/                Published GitHub Pages site
+data/                Sample datasets
+```
 
-- **Backend:** Python, FastAPI, Uvicorn, Pydantic, Requests, BeautifulSoup, python-whois, Pillow, imagehash, scikit-learn
-- **Frontend:** Vanilla JavaScript, Chrome Extension API (Manifest V3)
-- **Analiz:** Levenshtein mesafesi, algısal hash (pHash), K-Means kümeleme, ağırlıklı sinyal puanlama
+## Tech
 
----
+Python, FastAPI, Uvicorn, Pydantic, Requests, BeautifulSoup, python-whois, Pillow, imagehash, scikit-learn, vanilla JavaScript, Chrome Extension API (Manifest V3).
 
-## 📄 Lisans ve Not
+## Credits
 
-Bu proje **TÜBİTAK 2204-A Lise Öğrencileri Araştırma Projeleri** kapsamında geliştirilmiştir. Proje danışmanı: Oğuzhan Bilir. Örnek veri dosyaları ve referans yapıları depoda paylaşılmaktadır.
+Built with high school students for TÜBİTAK 2204-A. Advisor and developer: Oğuzhan Bilir.
